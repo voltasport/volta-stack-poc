@@ -37,7 +37,7 @@ export function ProgramDetail({
             Share status link
           </Link>
           <a
-            href="http://localhost:3000/"
+            href="https://volta-portal.vercel.app/"
             className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
           >
             Message Volta

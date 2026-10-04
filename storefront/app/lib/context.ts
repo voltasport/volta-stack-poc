@@ -15,6 +15,23 @@ const additionalContext = {
 // Automatically augment HydrogenAdditionalContext with the additional context type
 type AdditionalContextType = typeof additionalContext;
 
+function memoryCache(): Cache {
+  const store = new Map<string, Response>();
+  return {
+    async match(request: RequestInfo) {
+      const key = request instanceof Request ? request.url : String(request);
+      return store.get(key)?.clone();
+    },
+    async put(request: RequestInfo, response: Response) {
+      const key = request instanceof Request ? request.url : String(request);
+      store.set(key, response.clone());
+    },
+    async delete() {
+      return false;
+    },
+  } as Cache;
+}
+
 declare global {
   interface HydrogenAdditionalContext extends AdditionalContextType {}
 
@@ -41,7 +58,7 @@ export async function createHydrogenRouterContext(
 
   const waitUntil = executionContext.waitUntil.bind(executionContext);
   const [cache, session] = await Promise.all([
-    caches.open('hydrogen'),
+    typeof caches === 'undefined' ? memoryCache() : caches.open('hydrogen'),
     AppSession.init(request, [env.SESSION_SECRET]),
   ]);
 

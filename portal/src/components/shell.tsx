@@ -103,7 +103,7 @@ export function Shell({children}: {children: React.ReactNode}) {
             and roster data live in this app.
           </p>
           <a
-            href="http://localhost:3001/portal"
+            href="https://volta-storefront.vercel.app/portal"
             className="shrink-0 font-semibold text-[#147a45] underline-offset-2 hover:underline"
           >
             Open the Hydrogen proof

@@ -32,7 +32,7 @@ export function ProofApproval() {
           <span className="font-semibold text-white">Next.js + Vercel.</span> This approval is app
           state. Nothing is written to Shopify.
         </p>
-        <a href="http://localhost:3001/portal/approvals/away-kit" className="font-semibold text-[#8ee8b4]">
+        <a href="https://volta-storefront.vercel.app/portal/approvals/away-kit" className="font-semibold text-[#8ee8b4]">
           Open the Hydrogen proof
         </a>
       </div>

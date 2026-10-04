@@ -17,7 +17,7 @@ const nav = [
     alert: true,
     match: 'roster' as const,
   },
-  {href: '/', label: 'Team stores', match: 'shop' as const},
+  {href: '/portal/store', label: 'Team stores', match: 'prefix' as const},
   {
     href: '/portal/programs/cross-country?tab=files',
     label: 'Invoices',
@@ -101,10 +101,10 @@ export function PortalShell({children}: {children: React.ReactNode}) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center justify-between gap-4 border-b border-[#e4dfd4] bg-[#f7f4ee] px-6 py-2 text-xs text-[#5d6b7a]">
           <p>
-            <span className="font-semibold text-[#122033]">Hydrogen + Shopify.</span> This portal is custom React. Team stores opens the live Shopify catalog.
+            <span className="font-semibold text-[#122033]">Hydrogen + Shopify.</span> Director screens use the Volta layout. Team stores reads the live Shopify catalog.
           </p>
           <a
-            href="http://localhost:3000"
+            href="https://volta-portal.vercel.app"
             className="shrink-0 font-semibold text-[#147a45] no-underline"
           >
             Open the Next.js proof

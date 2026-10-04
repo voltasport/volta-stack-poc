@@ -5,8 +5,15 @@ import {oxygen} from '@shopify/mini-oxygen/vite';
 import {reactRouter} from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
 
-export default defineConfig({
-  plugins: [tailwindcss(), hydrogen(), oxygen(), reactRouter()],
+const onVercel = process.env.VERCEL === '1';
+
+export default defineConfig(({isSsrBuild}) => ({
+  plugins: [
+    tailwindcss(),
+    hydrogen(),
+    onVercel ? null : oxygen(),
+    reactRouter(),
+  ].filter((plugin) => plugin !== null),
   resolve: {
     alias: {
       // Vite's native tsconfig path resolver does not cover JavaScript
@@ -19,6 +26,8 @@ export default defineConfig({
     // Allow a strict Content-Security-Policy
     // without inlining assets as base64:
     assetsInlineLimit: 0,
+    rollupOptions:
+      onVercel && isSsrBuild ? {input: './server/vercel.ts'} : undefined,
   },
   ssr: {
     optimizeDeps: {
@@ -33,6 +42,7 @@ export default defineConfig({
        * @see https://vitejs.dev/config/dep-optimization-options
        */
       include: [
+        'react-dom/server.browser',
         'react-router > set-cookie-parser',
         'react-router > cookie',
         'react-router',
@@ -42,4 +52,4 @@ export default defineConfig({
   server: {
     allowedHosts: ['.tryhydrogen.dev'],
   },
-});
+}));

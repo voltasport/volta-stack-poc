@@ -33,7 +33,7 @@ export function ProofApproval() {
           <span className="font-semibold text-white">Hydrogen + Shopify.</span> This approval is app
           state. The team store cart is the Shopify piece.
         </p>
-        <a href="http://localhost:3000/approvals/away-kit" className="font-semibold text-[#8ee8b4]">
+        <a href="https://volta-portal.vercel.app/approvals/away-kit" className="font-semibold text-[#8ee8b4]">
           Open the Hydrogen proof
         </a>
       </div>
