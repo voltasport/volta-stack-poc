@@ -1,5 +1,7 @@
 -- Slim portal schema. Programs, proofs, and rosters live here.
 -- Shopify stays the catalog and checkout. This database does not store products.
+-- Auth tables match Better Auth's default Postgres names. The portal does not
+-- require a session; these tables are here so sign-in can be added later.
 
 create table if not exists programs (
   slug text primary key,
@@ -88,3 +90,67 @@ create table if not exists updates (
   when_label text not null,
   sort_order integer not null
 );
+
+create table if not exists "user" (
+  id text primary key,
+  name text not null,
+  email text not null,
+  "emailVerified" boolean not null default false,
+  image text,
+  "createdAt" timestamptz not null default now(),
+  "updatedAt" timestamptz not null default now()
+);
+
+create unique index if not exists user_email_uidx on "user" (email);
+
+create table if not exists "session" (
+  id text primary key,
+  "expiresAt" timestamptz not null,
+  token text not null,
+  "createdAt" timestamptz not null default now(),
+  "updatedAt" timestamptz not null default now(),
+  "ipAddress" text,
+  "userAgent" text,
+  "userId" text not null references "user" (id) on delete cascade
+);
+
+create unique index if not exists session_token_uidx on "session" (token);
+create index if not exists "session_userId_idx" on "session" ("userId");
+
+create table if not exists "account" (
+  id text primary key,
+  "accountId" text not null,
+  "providerId" text not null,
+  "userId" text not null references "user" (id) on delete cascade,
+  "accessToken" text,
+  "refreshToken" text,
+  "idToken" text,
+  "accessTokenExpiresAt" timestamptz,
+  "refreshTokenExpiresAt" timestamptz,
+  scope text,
+  password text,
+  "createdAt" timestamptz not null default now(),
+  "updatedAt" timestamptz not null default now()
+);
+
+create index if not exists "account_userId_idx" on "account" ("userId");
+
+create table if not exists "verification" (
+  id text primary key,
+  identifier text not null,
+  value text not null,
+  "expiresAt" timestamptz not null,
+  "createdAt" timestamptz not null default now(),
+  "updatedAt" timestamptz not null default now()
+);
+
+create index if not exists verification_identifier_idx on "verification" (identifier);
+
+create table if not exists "rateLimit" (
+  id text primary key,
+  key text not null,
+  count integer not null,
+  "lastRequest" bigint not null
+);
+
+create unique index if not exists "rateLimit_key_uidx" on "rateLimit" (key);
