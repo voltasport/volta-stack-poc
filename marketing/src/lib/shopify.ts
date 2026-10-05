@@ -24,13 +24,16 @@ const QUERY = `
   }
 `;
 
-export async function fetchShopifyProducts(): Promise<{
-  domain: string;
-  products: ShopifyProduct[];
-}> {
-  const domain = process.env.SHOPIFY_STORE_DOMAIN ?? "mock.shop";
-  const token =
-    process.env.SHOPIFY_STOREFRONT_TOKEN ?? "3b580e70970c4528da70c98e097c2fa0";
+const portalOrigin = process.env.PORTAL_ORIGIN ?? "https://voltasport.vercel.app";
+
+export async function fetchShopifyProducts(): Promise<ShopifyProduct[]> {
+  const domain = process.env.SHOPIFY_STORE_DOMAIN;
+  const token = process.env.SHOPIFY_STOREFRONT_TOKEN;
+  if (!domain || !token) {
+    const response = await fetch(`${portalOrigin}/api/catalog`, {next: {revalidate: 60}});
+    if (!response.ok) return [];
+    return (await response.json()) as ShopifyProduct[];
+  }
 
   const response = await fetch(`https://${domain}/api/2025-07/graphql.json`, {
     method: "POST",
@@ -55,16 +58,13 @@ export async function fetchShopifyProducts(): Promise<{
           vendor: string;
           featuredImage: {url: string} | null;
           priceRange: {minVariantPrice: {amount: string; currencyCode: string}};
-          selectedOrFirstAvailableVariant: {
-            id: string;
-            availableForSale: boolean;
-          } | null;
+          selectedOrFirstAvailableVariant: {id: string; availableForSale: boolean} | null;
         }>;
       };
     };
   };
 
-  const products = (json.data?.products.nodes ?? []).map((product) => ({
+  return (json.data?.products.nodes ?? []).map((product) => ({
     id: product.id,
     title: product.title,
     vendor: product.vendor,
@@ -74,6 +74,4 @@ export async function fetchShopifyProducts(): Promise<{
     variantId: product.selectedOrFirstAvailableVariant?.id ?? null,
     available: product.selectedOrFirstAvailableVariant?.availableForSale ?? false,
   }));
-
-  return {domain, products};
 }

@@ -43,6 +43,16 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
     },
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "director",
+          input: false,
+        },
+      },
+    },
     secret,
     baseURL: resolveAuthBaseURL(),
     rateLimit: {
@@ -55,7 +65,7 @@ function createAuth() {
 
 let auth: ReturnType<typeof createAuth> | undefined;
 
-/** Better Auth instance. Pages stay public; nothing redirects to a login screen. */
+/** Better Auth instance. Portal pages require a session. The marketing site does not. */
 export function getAuth() {
   auth ??= createAuth();
   return auth;

@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import {usePathname, useSearchParams} from "next/navigation";
-import {Suspense} from "react";
+import {usePathname, useRouter, useSearchParams} from "next/navigation";
+import {Suspense, useEffect, useState} from "react";
+import {signOut, useSession} from "@/lib/auth-client";
+import {allSchools, entities, entityBySlug} from "@/lib/entities";
 
 const nav = [
   {href: "/", label: "Overview", match: "exact" as const},
@@ -14,10 +16,73 @@ const nav = [
   {href: "/programs/cross-country?tab=files", label: "Artwork locker", match: "none" as const},
 ];
 
+function EntitySwitcher({
+  slug,
+  includeAll,
+  onChange,
+}: {
+  slug: string;
+  includeAll: boolean;
+  onChange: (slug: string) => void;
+}) {
+  const router = useRouter();
+  const choices = includeAll ? [allSchools, ...entities] : entities;
+  const entity = choices.find((item) => item.slug === slug) ?? choices[0];
+
+  return (
+    <label className="mx-3 mt-4 flex items-center gap-2 rounded-xl bg-[#163024] px-3 py-2">
+      <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#3dcb7a] text-[11px] font-bold text-[#0c1726]">
+        {entity.short}
+      </span>
+      <select
+        aria-label="School"
+        value={entity.slug}
+        onChange={(event) => {
+          const next = event.target.value;
+          document.cookie = `volta_entity=${encodeURIComponent(next)}; path=/; max-age=31536000; samesite=lax`;
+          onChange(next);
+          router.refresh();
+        }}
+        className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-white outline-none"
+      >
+        {choices.map((item) => (
+          <option key={item.slug} value={item.slug} className="text-[#0c1726]">
+            {item.name}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const search = useSearchParams();
   const tab = search.get("tab");
+  const {data: session, isPending} = useSession();
+  const isAdmin = (session?.user as {role?: string} | undefined)?.role === "admin";
+  const [slug, setSlug] = useState(entities[0].slug);
+
+  useEffect(() => {
+    if (isPending) return;
+    const row = document.cookie.split("; ").find((entry) => entry.startsWith("volta_entity="));
+    const fromCookie = row ? decodeURIComponent(row.slice("volta_entity=".length)) : null;
+    if (fromCookie === allSchools.slug && !isAdmin) {
+      setSlug(entities[0].slug);
+      return;
+    }
+    if (fromCookie) {
+      setSlug(fromCookie);
+      return;
+    }
+    if (isAdmin) {
+      document.cookie = `volta_entity=${allSchools.slug}; path=/; max-age=31536000; samesite=lax`;
+      setSlug(allSchools.slug);
+    }
+  }, [isAdmin, isPending]);
+
+  const entity = entityBySlug(slug);
 
   return (
     <aside className="flex w-[240px] shrink-0 flex-col bg-[#0c1726] text-white">
@@ -28,16 +93,7 @@ function Sidebar() {
         </span>
       </div>
 
-      <button
-        type="button"
-        className="mx-3 mt-4 flex items-center gap-2 rounded-xl bg-[#163024] px-3 py-2 text-left"
-      >
-        <span className="grid h-7 w-7 place-items-center rounded-lg bg-[#3dcb7a] text-[11px] font-bold text-[#0c1726]">
-          SL
-        </span>
-        <span className="flex-1 text-sm font-semibold">SLCC Athletics</span>
-        <span className="text-[#8aa0b5]">▾</span>
-      </button>
+      <EntitySwitcher slug={slug} includeAll={isAdmin} onChange={setSlug} />
 
       <nav className="mt-4 flex flex-1 flex-col gap-1 px-3">
         {nav.map((item) => {
@@ -60,7 +116,7 @@ function Sidebar() {
               }`}
             >
               <span>{item.label}</span>
-              {item.count ? (
+              {item.count && entity.programs ? (
                 <span
                   className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[11px] font-bold ${
                     item.alert ? "bg-[#3dcb7a] text-[#0c1726]" : "text-[#8aa0b5]"
@@ -74,6 +130,17 @@ function Sidebar() {
         })}
       </nav>
 
+      <button
+        type="button"
+        className="mx-3 mb-1 text-left text-xs font-semibold text-[#9eb0c2]"
+        onClick={async () => {
+          await signOut();
+          router.push("/login");
+          router.refresh();
+        }}
+      >
+        Sign out
+      </button>
       <div className="m-3 flex items-center gap-3 rounded-2xl bg-[#13283a] p-3">
         <span className="grid h-9 w-9 place-items-center rounded-full bg-[#24384c] text-[11px] font-bold">
           MO

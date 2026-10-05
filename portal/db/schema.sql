@@ -98,7 +98,8 @@ create table if not exists "user" (
   "emailVerified" boolean not null default false,
   image text,
   "createdAt" timestamptz not null default now(),
-  "updatedAt" timestamptz not null default now()
+  "updatedAt" timestamptz not null default now(),
+  role text not null default 'director'
 );
 
 create unique index if not exists user_email_uidx on "user" (email);

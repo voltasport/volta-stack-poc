@@ -1,4 +1,5 @@
 import type {Metadata} from "next";
+import type {ReactNode} from "react";
 import {Geist} from "next/font/google";
 import "./globals.css";
 
@@ -12,7 +13,7 @@ export const metadata: Metadata = {
   description: "Next.js proof of concept for the Volta athletics portal",
 };
 
-export default function RootLayout({children}: LayoutProps<"/">) {
+export default function RootLayout({children}: {children: ReactNode}) {
   return (
     <html lang="en" className={`${geistSans.variable} h-full antialiased`}>
       <body className="min-h-full">{children}</body>

@@ -1,11 +1,38 @@
 import Link from "next/link";
 import {getPrograms, getTasks, getUpdates} from "@/lib/queries";
 import {Segments, Shell, StatusPill} from "@/components/shell";
+import {currentEntity} from "@/lib/current-entity";
+import {allSchools, entities, productsForEntity} from "@/lib/entities";
+import {fetchShopifyProducts} from "@/lib/shopify";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const [programs, needsYou, updates] = await Promise.all([getPrograms(), getTasks(), getUpdates()]);
+  const entity = await currentEntity();
+  if (!entity.programs) {
+    return (
+      <Shell>
+        <p className="text-sm text-[#6d7b8a]">{entity.name}</p>
+        <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">NO PROGRAMS YET</h1>
+        <p className="mt-4 max-w-xl text-sm leading-6 text-[#3c4a5c]">
+          Program tracking in this portal is filed under SLCC Athletics. {entity.name} gear, when
+          it is in the Shopify catalog, shows up under Team stores.
+        </p>
+      </Shell>
+    );
+  }
+  const [programs, needsYou, updates, catalog] = await Promise.all([
+    getPrograms(),
+    getTasks(),
+    getUpdates(),
+    entity.slug === allSchools.slug ? fetchShopifyProducts() : Promise.resolve(null),
+  ]);
+  const schools = catalog
+    ? entities.map((school) => ({
+        ...school,
+        count: productsForEntity(catalog.products, school.slug).length,
+      }))
+    : [];
   return (
     <Shell>
       <div className="flex items-start justify-between gap-6">
@@ -30,6 +57,26 @@ export default async function OverviewPage() {
           </button>
         </div>
       </div>
+
+      {schools.length > 0 ? (
+        <ul className="mt-6 grid grid-cols-3 gap-3">
+          {schools
+            .filter((school) => school.slug !== "other" || school.count > 0)
+            .map((school) => (
+              <li key={school.slug} className="rounded-3xl bg-white px-5 py-4">
+                <p className="text-xs font-semibold tracking-wide text-[#6d7b8a]">{school.short}</p>
+                <p className="mt-1 text-lg font-black">{school.name}</p>
+                <p className="mt-2 text-sm text-[#3c4a5c]">
+                  {school.programs
+                    ? `${programs.length} programs${school.count ? ` · ${school.count} products` : " · no retail products"}`
+                    : school.count === 0
+                      ? "No retail products"
+                      : `${school.count} products`}
+                </p>
+              </li>
+            ))}
+        </ul>
+      ) : null}
 
       <div className="mt-6 grid grid-cols-4 gap-3">
         <Stat label="Active programs" value="4" />
