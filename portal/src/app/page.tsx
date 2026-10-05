@@ -1,8 +1,11 @@
 import Link from "next/link";
-import {needsYou, programs, updates} from "@/lib/data";
+import {getPrograms, getTasks, getUpdates} from "@/lib/queries";
 import {Segments, Shell, StatusPill} from "@/components/shell";
 
-export default function OverviewPage() {
+export const dynamic = "force-dynamic";
+
+export default async function OverviewPage() {
+  const [programs, needsYou, updates] = await Promise.all([getPrograms(), getTasks(), getUpdates()]);
   return (
     <Shell>
       <div className="flex items-start justify-between gap-6">

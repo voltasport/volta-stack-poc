@@ -1,8 +1,11 @@
 import Link from "next/link";
-import {programs} from "@/lib/data";
+import {getPrograms} from "@/lib/queries";
 import {Shell, StatusPill} from "@/components/shell";
 
-export default function ProgramsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function ProgramsPage() {
+  const programs = await getPrograms();
   return (
     <Shell>
       <p className="text-sm text-[#6d7b8a]">SLCC Athletics</p>

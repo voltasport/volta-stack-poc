@@ -1,7 +1,9 @@
 import {notFound} from "next/navigation";
 import {ProgramDetail} from "@/components/program-detail";
 import {Shell} from "@/components/shell";
-import {getProgram} from "@/lib/data";
+import {getProgram} from "@/lib/queries";
+
+export const dynamic = "force-dynamic";
 
 export default async function ProgramPage({
   params,
@@ -12,7 +14,7 @@ export default async function ProgramPage({
 }) {
   const {slug} = await params;
   const {tab} = await searchParams;
-  const program = getProgram(slug);
+  const program = await getProgram(slug);
   if (!program) notFound();
 
   return (

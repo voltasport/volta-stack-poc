@@ -1,3 +1,6 @@
+// Sample records used to seed the Neon database. The portal reads programs
+// from Postgres at runtime. See portal/db/schema.sql.
+
 export type Status = "On track" | "Needs you" | "Complete" | "Starting";
 
 export type TabId = "items" | "roster" | "proofs" | "files";
