@@ -127,20 +127,30 @@ function SidebarPanel({
   return (
     <>
       <div
-        className={`flex shrink-0 items-center gap-2 border-b border-white/5 px-3 py-4 ${
-          collapsed ? "justify-center" : "px-5"
+        className={`flex shrink-0 items-center border-b border-white/5 py-4 ${
+          collapsed ? "flex-col gap-2 px-2" : "justify-between gap-2 px-5"
         }`}
       >
         {!collapsed ? (
-          <>
+          <div className="flex min-w-0 items-center gap-2">
             <span className="text-[15px] font-extrabold tracking-[0.14em]">VOLTA</span>
             <span className="rounded-full bg-[#16304a] px-2 py-0.5 text-[10px] font-semibold tracking-wide text-[#9eb6c9]">
               PORTAL
             </span>
-          </>
+          </div>
         ) : (
           <span className="text-[13px] font-extrabold tracking-[0.12em]">V</span>
         )}
+        <button
+          type="button"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          onClick={onToggleCollapsed}
+          className={`hidden shrink-0 rounded-lg text-xs font-semibold text-[#9eb0c2] hover:bg-white/5 hover:text-white lg:block ${
+            collapsed ? "grid h-8 w-8 place-items-center" : "px-2 py-1.5"
+          }`}
+        >
+          {collapsed ? "»" : "Collapse «"}
+        </button>
       </div>
 
       <EntitySwitcher slug={slug} includeAll={isAdmin} collapsed={collapsed} onChange={setSlug} />
@@ -192,18 +202,9 @@ function SidebarPanel({
       <div className="shrink-0 border-t border-white/5 px-3 py-3">
         <button
           type="button"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={onToggleCollapsed}
-          className="mb-2 hidden w-full items-center justify-center rounded-xl py-2 text-[#9eb0c2] hover:bg-white/5 lg:flex"
-          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          <span className="text-lg leading-none">{collapsed ? "»" : "«"}</span>
-          {!collapsed ? <span className="ml-2 text-xs font-semibold">Collapse</span> : null}
-        </button>
-        <button
-          type="button"
-          className={`mb-2 w-full text-left text-xs font-semibold text-[#9eb0c2] hover:text-white ${
-            collapsed ? "text-center" : "px-1"
+          aria-label="Sign out"
+          className={`mb-2 w-full rounded-lg text-xs font-semibold text-[#9eb0c2] hover:bg-white/5 hover:text-white ${
+            collapsed ? "px-1 py-2 text-center leading-tight" : "px-1 py-1.5 text-left"
           }`}
           onClick={async () => {
             await signOut();
@@ -211,7 +212,7 @@ function SidebarPanel({
             router.refresh();
           }}
         >
-          {collapsed ? "⎋" : "Sign out"}
+          Sign out
         </button>
         <div
           className={`flex items-center gap-3 rounded-2xl bg-[#13283a] p-3 ${
