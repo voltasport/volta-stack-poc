@@ -176,18 +176,32 @@ export async function getTasks(access: AccessContext) {
   try {
     const rows =
       access.programSlugs === null
-        ? await sql().query(`select href, title, detail, badge from tasks order by sort_order`)
+        ? await sql().query(
+            `select href, title, detail, badge, program_slug from tasks order by sort_order`,
+          )
         : await sql().query(
-            `select href, title, detail, badge from tasks
+            `select href, title, detail, badge, program_slug from tasks
              where program_slug is null or program_slug = any($1::text[])
              order by sort_order`,
             [access.programSlugs],
           );
-    return rows as {href: string; title: string; detail: string; badge: "check" | "4" | "doc"}[];
+    return rows as {
+      href: string;
+      title: string;
+      detail: string;
+      badge: "check" | "4" | "doc";
+      program_slug: string | null;
+    }[];
   } catch (error) {
     if (isMissingColumn(error, "program_slug")) {
       const rows = await sql().query(`select href, title, detail, badge from tasks order by sort_order`);
-      return rows as {href: string; title: string; detail: string; badge: "check" | "4" | "doc"}[];
+      return rows as {
+        href: string;
+        title: string;
+        detail: string;
+        badge: "check" | "4" | "doc";
+        program_slug: string | null;
+      }[];
     }
     throw error;
   }

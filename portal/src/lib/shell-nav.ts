@@ -50,7 +50,7 @@ export function buildNav(
     match: "roster",
   });
 
-  items.push({href: "/store", label: "Team stores", icon: "▥", match: "prefix"});
+  items.push({href: "/store", label: "Team stores", icon: "store", match: "prefix"});
   items.push({href: "/invoices", label: "Invoices", icon: "⎘", match: "invoices"});
 
   if (access.showArtworkLocker) {

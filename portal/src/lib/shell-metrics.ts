@@ -15,8 +15,15 @@ export async function getShellMetrics(
   const schoolFilter = entity.slug === "all" ? undefined : entity.slug;
   const programs = await getPrograms(access, schoolFilter);
   const tasks = await getTasks(access);
+  const scopedSlugs = new Set(programs.map((program) => program.slug));
+  const entityTasks =
+    entity.slug === "all"
+      ? tasks
+      : tasks.filter(
+          (task) => task.program_slug === null || scopedSlugs.has(task.program_slug),
+        );
   const approvalCount = access.showApprovals
-    ? tasks.filter((task) => task.href.startsWith("/approvals")).length
+    ? entityTasks.filter((task) => task.href.startsWith("/approvals")).length
     : 0;
   return {
     programs,
