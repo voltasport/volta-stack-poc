@@ -2,12 +2,24 @@ import type {AccessContext} from "@/lib/access";
 import {buildNav} from "@/lib/shell-nav";
 import {allSchools, type CatalogEntity} from "@/lib/entities";
 
+/** Serializable subset for the client Shell (no RegExp). */
+export type ShellEntity = Pick<CatalogEntity, "slug" | "name" | "short" | "programs">;
+
 export type ShellConfig = {
   nav: ReturnType<typeof buildNav>;
-  entityChoices: CatalogEntity[];
+  entityChoices: ShellEntity[];
   defaultEntitySlug: string;
   showAdminActions: boolean;
 };
+
+function toShellEntity(entity: CatalogEntity): ShellEntity {
+  return {
+    slug: entity.slug,
+    name: entity.name,
+    short: entity.short,
+    programs: entity.programs,
+  };
+}
 
 export function createShellConfig(
   access: AccessContext,
@@ -23,7 +35,9 @@ export function createShellConfig(
     item.match === "roster" ? {...item, href: rosterHref} : item,
   );
 
-  const entityChoices = access.canSeeAllSchools ? [allSchools, ...access.entities] : access.entities;
+  const entityChoices = (access.canSeeAllSchools ? [allSchools, ...access.entities] : access.entities).map(
+    toShellEntity,
+  );
 
   return {
     nav,

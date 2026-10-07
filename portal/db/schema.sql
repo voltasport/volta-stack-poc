@@ -112,6 +112,9 @@ create table if not exists "user" (
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now(),
   role text not null default 'director',
+  banned boolean not null default false,
+  "banReason" text,
+  "banExpires" timestamptz,
   constraint user_role_check check (role in ('admin', 'director', 'manager'))
 );
 
@@ -125,7 +128,8 @@ create table if not exists "session" (
   "updatedAt" timestamptz not null default now(),
   "ipAddress" text,
   "userAgent" text,
-  "userId" text not null references "user" (id) on delete cascade
+  "userId" text not null references "user" (id) on delete cascade,
+  "impersonatedBy" text
 );
 
 create unique index if not exists session_token_uidx on "session" (token);

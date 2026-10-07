@@ -2,6 +2,7 @@ import {cookies} from "next/headers";
 import {notFound, redirect} from "next/navigation";
 import {allSchools, entities, entityBySlug, type CatalogEntity} from "@/lib/entities";
 import {sql} from "@/lib/db";
+import {isMissingTable} from "@/lib/db-errors";
 import {parsePortalRole, type PortalRole} from "@/lib/roles";
 import {currentSession} from "@/lib/session";
 
@@ -18,14 +19,23 @@ export type AccessContext = {
   showApprovals: boolean;
   showArtworkLocker: boolean;
   showUsersNav: boolean;
+  /** True when assignment table is missing — login works; run db:migrate for scoping. */
+  preMigrationMode: boolean;
 };
 
-async function loadProgramSlugs(userId: string): Promise<string[]> {
-  const rows = (await sql().query(
-    `select program_slug from user_program_assignments where user_id = $1 order by program_slug`,
-    [userId],
-  )) as {program_slug: string}[];
-  return rows.map((row) => row.program_slug);
+async function loadProgramSlugs(userId: string): Promise<{slugs: string[]; preMigration: boolean}> {
+  try {
+    const rows = (await sql().query(
+      `select program_slug from user_program_assignments where user_id = $1 order by program_slug`,
+      [userId],
+    )) as {program_slug: string}[];
+    return {slugs: rows.map((row) => row.program_slug), preMigration: false};
+  } catch (error) {
+    if (isMissingTable(error, "user_program_assignments")) {
+      return {slugs: [], preMigration: true};
+    }
+    throw error;
+  }
 }
 
 async function loadSchoolSlugsForPrograms(programSlugs: string[]): Promise<string[]> {
@@ -58,10 +68,11 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showApprovals: true,
       showArtworkLocker: true,
       showUsersNav: true,
+      preMigrationMode: false,
     };
   }
 
-  const programSlugs = await loadProgramSlugs(userId);
+  const {slugs: programSlugs, preMigration} = await loadProgramSlugs(userId);
   const schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
   const allowedEntities = entities.filter((entity) => schoolSlugs.includes(entity.slug));
 
@@ -69,14 +80,15 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     userId,
     role,
     email,
-    programSlugs,
-    schoolSlugs,
-    entities: allowedEntities,
+    programSlugs: preMigration ? null : programSlugs,
+    schoolSlugs: preMigration ? null : schoolSlugs,
+    entities: preMigration ? entities : allowedEntities,
     canSeeAllSchools: false,
     showAdminActions: false,
     showApprovals: false,
     showArtworkLocker: false,
     showUsersNav: false,
+    preMigrationMode: preMigration,
   };
 }
 

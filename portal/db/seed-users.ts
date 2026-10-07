@@ -65,9 +65,15 @@ async function upsertUser(
     await sql.query(
       `insert into account (id, "accountId", "providerId", "userId", password, "createdAt", "updatedAt")
        values ($1, $2, 'credential', $3, $4, now(), now())`,
-      [id("acc"), input.email, userId, hashed],
+      [id("acc"), userId, userId, hashed],
     );
   }
+
+  await sql.query(
+    `update account set "accountId" = $2, "updatedAt" = now()
+     where "userId" = $1 and "providerId" = 'credential' and "accountId" <> $2`,
+    [userId, userId],
+  );
 
   await sql.query(`delete from user_program_assignments where user_id = $1`, [userId]);
   for (const programSlug of input.programs) {
