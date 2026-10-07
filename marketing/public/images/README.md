@@ -2,7 +2,7 @@
 
 | File | Source |
 | --- | --- |
-| `utah-prep-home-kit.png`, `davis-crewneck.png`, `utah-prep-backpack.png` | Volta Shopify storefront CDN (read-only download) |
+| `utah-prep-home-kit.png`, `davis-crewneck.png`, `utah-prep-backpack.png` | Volta product catalog (read-only download) |
 | `hero-soccer-player.jpg`, `case-study-*.jpg`, `headshot-*.jpg` | [Unsplash](https://unsplash.com) (free license) |
 | `case-study-soccer-1.jpg`, `proof-kit-mock.jpg`, `store-mock.jpg` | [Pexels](https://pexels.com) (free license) |
 

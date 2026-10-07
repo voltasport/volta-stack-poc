@@ -1,17 +1,19 @@
 "use server";
 
+import {portalApiOrigin} from "@/lib/site-urls";
+
 export async function createShopifyCheckout(lines: {merchandiseId: string; quantity: number}[]) {
   const domain = process.env.SHOPIFY_STORE_DOMAIN;
   const token = process.env.SHOPIFY_STOREFRONT_TOKEN;
   if (!domain || !token) {
-    const origin = process.env.PORTAL_ORIGIN ?? "https://voltasport.vercel.app";
+    const origin = portalApiOrigin;
     const response = await fetch(`${origin}/api/checkout`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify(lines),
     });
     const json = (await response.json()) as {checkoutUrl?: string; error?: string};
-    if (!json.checkoutUrl) throw new Error(json.error ?? "Shopify did not return a checkout");
+    if (!json.checkoutUrl) throw new Error(json.error ?? "Checkout could not be created");
     return json.checkoutUrl;
   }
 
@@ -43,7 +45,7 @@ export async function createShopifyCheckout(lines: {merchandiseId: string; quant
   const checkoutUrl = json.data?.cartCreate?.cart?.checkoutUrl;
   if (!checkoutUrl) {
     throw new Error(
-      json.data?.cartCreate?.userErrors?.[0]?.message ?? "Shopify did not return a checkout",
+      json.data?.cartCreate?.userErrors?.[0]?.message ?? "Checkout could not be created",
     );
   }
   return checkoutUrl;

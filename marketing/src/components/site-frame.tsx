@@ -1,6 +1,5 @@
 import Link from "next/link";
-
-const PORTAL = "https://voltasport.vercel.app/login";
+import {portalLoginUrl} from "@/lib/site-urls";
 
 const links = [
   {href: "/how-it-works", label: "How it works"},
@@ -67,11 +66,11 @@ export function SiteFooter() {
           <Link href="/consult" style={{color: "#4A5566", textDecoration: "none"}}>
             Contact
           </Link>
-          <a href={PORTAL} style={{color: "#4A5566", textDecoration: "none"}}>
-            Director login
-          </a>
+          <Link href={portalLoginUrl} className="link-muted">
+            Program portal
+          </Link>
         </nav>
-        <span>© 2026 Volta Sport · Built in Utah</span>
+        <span>© 2026 Volta Sport</span>
       </div>
     </footer>
   );

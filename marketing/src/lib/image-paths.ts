@@ -1,4 +1,4 @@
-/** Local marketing imagery (Shopify product shots + licensed stock). */
+/** Local marketing imagery (Volta product shots + licensed stock). */
 export const marketingImages = {
   heroPlayer: "/images/hero-soccer-player.jpg",
   tileGameDay: "/images/utah-prep-home-kit.png",

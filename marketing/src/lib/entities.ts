@@ -2,7 +2,7 @@ export type CatalogEntity = {
   slug: string;
   name: string;
   short: string;
-  /** Program, proof, and roster work for this school lives in the director portal. */
+  /** Program, proof, and roster work for this school lives in the program portal. */
   programs: boolean;
   match: RegExp | null;
 };

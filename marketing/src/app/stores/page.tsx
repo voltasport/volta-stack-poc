@@ -2,10 +2,9 @@ import Link from "next/link";
 import {SiteFooter, SiteHeader} from "@/components/site-frame";
 import {entities, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
+import {portalLoginUrl} from "@/lib/site-urls";
 
 export const dynamic = "force-dynamic";
-
-const PORTAL = "https://voltasport.vercel.app/login";
 
 export default async function StoresPage() {
   const products = await fetchShopifyProducts();
@@ -25,8 +24,7 @@ export default async function StoresPage() {
             One link. Every family.
           </h1>
           <p style={{maxWidth: 520, fontSize: 18, lineHeight: 1.5, color: "#B8C2D3"}}>
-            Your store, your colors. Checkout stays on Shopify. The director workspace for programs
-            and proofs is a separate login.
+            Your store, your colors. Families check out securely on your store. Coaches manage programs, proofs, and rosters in the program portal.
           </p>
         </div>
       </section>
@@ -34,14 +32,14 @@ export default async function StoresPage() {
         <div className="wrap" style={{display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16}}>
           {stores.map(({entity, products: gear}) => (
             <article key={entity.slug} style={{background: "#fff", borderRadius: 24, padding: 24}}>
-              <span className="tag tag-live">{entity.programs ? "Portal + store" : "Team store"}</span>
+              <span className="tag tag-live">{entity.programs ? "Program portal + store" : "Team store"}</span>
               <h2 className="disp" style={{fontSize: 40, color: "#101B2D", margin: "16px 0 8px"}}>
                 {entity.name}
               </h2>
               <p style={{color: "#4A5566", minHeight: 48}}>
                 {gear.length > 0
-                  ? `${gear.length} products in the Shopify catalog.`
-                  : "No retail products filed here yet. Programs and proofs live in the director portal."}
+                  ? `${gear.length} items in this team store.`
+                  : "Gear orders run through the program portal until your store catalog is live here."}
               </p>
               <div style={{display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16}}>
                 {gear.length > 0 ? (
@@ -50,8 +48,8 @@ export default async function StoresPage() {
                   </Link>
                 ) : null}
                 {entity.programs ? (
-                  <a className="btn btn-g" href={PORTAL} style={{minHeight: 44}}>
-                    Director login
+                  <a className="btn btn-g" href={portalLoginUrl} style={{minHeight: 44}}>
+                    Program portal
                   </a>
                 ) : null}
               </div>

@@ -18,7 +18,7 @@ export default function ConsultPage() {
               15 minutes. Free advice, worst case.
             </p>
             <ol style={{display: "flex", flexDirection: "column", gap: 14, marginTop: 32, padding: 0, listStyle: "none"}}>
-              {["Tell us about your program", "Pick a 15-minute slot", "Mockups in 3 business days"].map(
+              {["Tell us about your program", "Pick a 15-minute slot", "Design proofs in 3 business days"].map(
                 (step, index) => (
                   <li key={step} style={{display: "flex", gap: 16, alignItems: "baseline"}}>
                     <span className="disp" style={{fontSize: 28, color: "#2E7A4A"}}>

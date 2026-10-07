@@ -94,12 +94,12 @@ export function StoreBrowser({
               );
               window.location.assign(checkoutUrl);
             } catch (error) {
-              setCheckoutError(error instanceof Error ? error.message : "Could not open Shopify checkout");
+              setCheckoutError(error instanceof Error ? error.message : "Could not start checkout");
               setCheckingOut(false);
             }
           }}
         >
-          {checkingOut ? "Opening Shopify…" : "Continue in Shopify"}
+          {checkingOut ? "Opening checkout…" : "Continue to checkout"}
         </button>
         {checkoutError ? <p style={{color: "#f0b4b4", fontSize: 13}}>{checkoutError}</p> : null}
       </aside>

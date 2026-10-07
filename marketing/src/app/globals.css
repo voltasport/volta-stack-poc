@@ -408,6 +408,10 @@ footer a.link-muted:hover {
   background: #26395a;
   color: #d4dbe6;
 }
+.tag-included {
+  background: #26395a;
+  color: #d4dbe6;
+}
 
 .marq {
   display: flex;

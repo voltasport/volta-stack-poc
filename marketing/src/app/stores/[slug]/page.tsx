@@ -26,8 +26,7 @@ export default async function StorePage({params}: {params: Promise<{slug: string
             {entityBySlug(slug).name}
           </h1>
           <p style={{color: "#4A5566", marginBottom: 28}}>
-            These products come from the Volta Sport Shopify catalog. Checkout, tax, and Shop Pay
-            open on Shopify.
+            Official gear for this program. Checkout includes tax and Shop Pay where available.
           </p>
           <StoreBrowser name={entity.name} products={products} />
         </div>

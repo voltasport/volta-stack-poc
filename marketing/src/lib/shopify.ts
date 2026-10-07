@@ -1,3 +1,5 @@
+import {portalApiOrigin} from "@/lib/site-urls";
+
 export type ShopifyProduct = {
   id: string;
   title: string;
@@ -24,7 +26,7 @@ const QUERY = `
   }
 `;
 
-const portalOrigin = process.env.PORTAL_ORIGIN ?? "https://voltasport.vercel.app";
+const portalOrigin = portalApiOrigin;
 
 export async function fetchShopifyProducts(): Promise<ShopifyProduct[]> {
   const domain = process.env.SHOPIFY_STORE_DOMAIN;
