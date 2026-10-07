@@ -2,12 +2,11 @@
 
 import {useState} from "react";
 import {useRouter, useSearchParams} from "next/navigation";
-import {signIn, signUp} from "@/lib/auth-client";
+import {signIn} from "@/lib/auth-client";
 
 export function LoginForm() {
   const router = useRouter();
   const search = useSearchParams();
-  const [mode, setMode] = useState<"in" | "up">("in");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -19,13 +18,9 @@ export function LoginForm() {
         const data = new FormData(event.currentTarget);
         const email = String(data.get("email") ?? "");
         const password = String(data.get("password") ?? "");
-        const name = String(data.get("name") ?? "Director");
         setPending(true);
         setError(null);
-        const result =
-          mode === "in"
-            ? await signIn.email({email, password})
-            : await signUp.email({email, password, name});
+        const result = await signIn.email({email, password});
         setPending(false);
         if (result.error) {
           setError(result.error.message ?? "Could not sign in");
@@ -35,12 +30,6 @@ export function LoginForm() {
         router.refresh();
       }}
     >
-      {mode === "up" ? (
-        <label className="flex flex-col gap-1 text-sm font-semibold">
-          Name
-          <input name="name" required className="rounded-xl border border-[#d9d3c8] px-3 py-2 font-normal" />
-        </label>
-      ) : null}
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Email
         <input
@@ -58,7 +47,7 @@ export function LoginForm() {
           type="password"
           required
           minLength={8}
-          autoComplete={mode === "in" ? "current-password" : "new-password"}
+          autoComplete="current-password"
           className="rounded-xl border border-[#d9d3c8] px-3 py-2 font-normal"
         />
       </label>
@@ -68,18 +57,11 @@ export function LoginForm() {
         disabled={pending}
         className="rounded-full bg-[#122033] px-4 py-3 text-sm font-semibold text-white disabled:bg-[#c5ced6]"
       >
-        {pending ? "Working…" : mode === "in" ? "Sign in" : "Create account"}
+        {pending ? "Working…" : "Sign in"}
       </button>
-      <button
-        type="button"
-        className="text-sm font-semibold text-[#147a45]"
-        onClick={() => {
-          setMode(mode === "in" ? "up" : "in");
-          setError(null);
-        }}
-      >
-        {mode === "in" ? "Need an account? Create one" : "Already have an account? Sign in"}
-      </button>
+      <p className="text-sm text-[#5d6b7a]">
+        Need access? Ask a Volta admin to create your account and send an invite link.
+      </p>
     </form>
   );
 }

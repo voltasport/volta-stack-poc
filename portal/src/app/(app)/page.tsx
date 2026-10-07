@@ -1,40 +1,47 @@
 import Link from "next/link";
-import {getPrograms, getTasks, getUpdates} from "@/lib/queries";
-import {Segments, Shell, StatusPill} from "@/components/shell";
-import {currentEntity} from "@/lib/current-entity";
+import {getUpdates} from "@/lib/queries";
+import {AdminActions, Segments, Shell, StatusPill} from "@/components/shell";
 import {allSchools, entities, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
+import {loadPortalPage} from "@/lib/page-shell";
 
 export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
-  const entity = await currentEntity();
-  if (!entity.programs) {
+  const {access, entity, programs, tasks, shellConfig} = await loadPortalPage();
+  const updates = await getUpdates();
+
+  if (programs.length === 0 && entity.slug !== allSchools.slug) {
     return (
-      <Shell>
+      <Shell config={shellConfig}>
         <p className="text-sm text-[#6d7b8a]">{entity.name}</p>
         <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">NO PROGRAMS YET</h1>
         <p className="mt-4 max-w-xl text-sm leading-6 text-[#3c4a5c]">
-          Program tracking in this portal is filed under SLCC Athletics. {entity.name} gear, when
-          it is in the Shopify catalog, shows up under Team stores.
+          No programs are assigned to your account for {entity.name}. Team gear may still appear
+          under Team stores.
         </p>
       </Shell>
     );
   }
-  const [programs, needsYou, updates, catalog] = await Promise.all([
-    getPrograms(),
-    getTasks(),
-    getUpdates(),
-    entity.slug === allSchools.slug ? fetchShopifyProducts() : Promise.resolve(null),
-  ]);
+
+  const catalog =
+    access.role === "admin" && entity.slug === allSchools.slug
+      ? await fetchShopifyProducts()
+      : null;
+  const visibleSchools = access.canSeeAllSchools ? entities : access.entities;
   const schools = catalog
-    ? entities.map((school) => ({
+    ? visibleSchools.map((school) => ({
         ...school,
         count: productsForEntity(catalog.products, school.slug).length,
+        programCount: programs.filter((program) => program.schoolSlug === school.slug).length,
       }))
     : [];
+
+  const inProduction = programs.filter((program) => program.status === "On track" || program.phase.includes("PRODUCTION")).length;
+  const nextDelivery = programs.find((program) => program.deliveryDate !== "TBD")?.deliveryDate ?? "—";
+
   return (
-    <Shell>
+    <Shell config={shellConfig}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <p className="text-sm text-[#6d7b8a]">Saturday, Oct 3</p>
@@ -42,20 +49,7 @@ export default async function OverviewPage() {
             MORNING, BARBIE.
           </h1>
         </div>
-        <div className="flex flex-wrap gap-2 sm:pt-3">
-          <Link
-            href="/programs/cross-country"
-            className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
-          >
-            Share status link
-          </Link>
-          <button
-            type="button"
-            className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
-          >
-            + New program
-          </button>
-        </div>
+        <AdminActions show={shellConfig.showAdminActions} />
       </div>
 
       {schools.length > 0 ? (
@@ -67,8 +61,8 @@ export default async function OverviewPage() {
                 <p className="text-xs font-semibold tracking-wide text-[#6d7b8a]">{school.short}</p>
                 <p className="mt-1 text-lg font-black">{school.name}</p>
                 <p className="mt-2 text-sm text-[#3c4a5c]">
-                  {school.programs
-                    ? `${programs.length} programs${school.count ? ` · ${school.count} products` : " · no retail products"}`
+                  {school.programCount
+                    ? `${school.programCount} programs${school.count ? ` · ${school.count} products` : ""}`
                     : school.count === 0
                       ? "No retail products"
                       : `${school.count} products`}
@@ -79,9 +73,9 @@ export default async function OverviewPage() {
       ) : null}
 
       <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Stat label="Active programs" value="4" />
-        <Stat label="In production" value="2" />
-        <Stat label="Next delivery" value="OCT 17" />
+        <Stat label="Active programs" value={String(programs.length)} />
+        <Stat label="In production" value={String(inProduction)} />
+        <Stat label="Next delivery" value={nextDelivery} />
         <div className="rounded-3xl bg-[#0e1c30] px-5 py-4 text-white">
           <p className="text-xs text-[#b7c6d4]">Saved vs. dealer this year</p>
           <p className="mt-3 text-4xl font-black tracking-tight text-[#3ee58a]">$18.4K</p>
@@ -126,7 +120,7 @@ export default async function OverviewPage() {
               <span className="h-2 w-2 rounded-full bg-[#3dcb7a]" />
             </div>
             <ul className="flex flex-col gap-2">
-              {needsYou.map((item) => (
+              {tasks.map((item) => (
                 <li key={item.title}>
                   <Link
                     href={item.href}

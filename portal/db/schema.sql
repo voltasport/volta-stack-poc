@@ -21,6 +21,7 @@ create table if not exists programs (
   week_author text not null,
   ship_to text not null,
   ship_note text not null,
+  school_slug text not null default 'slcc',
   sort_order integer not null
 );
 
@@ -80,8 +81,19 @@ create table if not exists tasks (
   title text not null,
   detail text not null,
   badge text not null,
+  program_slug text references programs (slug) on delete set null,
   sort_order integer not null
 );
+
+create table if not exists user_program_assignments (
+  user_id text not null references "user" (id) on delete cascade,
+  program_slug text not null references programs (slug) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (user_id, program_slug)
+);
+
+create index if not exists user_program_assignments_user_idx
+  on user_program_assignments (user_id);
 
 create table if not exists updates (
   id bigint generated always as identity primary key,
@@ -99,7 +111,11 @@ create table if not exists "user" (
   image text,
   "createdAt" timestamptz not null default now(),
   "updatedAt" timestamptz not null default now(),
-  role text not null default 'director'
+  role text not null default 'director',
+  banned boolean not null default false,
+  "banReason" text,
+  "banExpires" timestamptz,
+  constraint user_role_check check (role in ('admin', 'director', 'manager'))
 );
 
 create unique index if not exists user_email_uidx on "user" (email);
@@ -112,7 +128,8 @@ create table if not exists "session" (
   "updatedAt" timestamptz not null default now(),
   "ipAddress" text,
   "userAgent" text,
-  "userId" text not null references "user" (id) on delete cascade
+  "userId" text not null references "user" (id) on delete cascade,
+  "impersonatedBy" text
 );
 
 create unique index if not exists session_token_uidx on "session" (token);

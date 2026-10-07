@@ -46,6 +46,7 @@ for (const statement of statements) {
 
 await sql.query(`
   truncate table
+    user_program_assignments,
     kit_items,
     roster_rows,
     milestones,
@@ -54,17 +55,17 @@ await sql.query(`
     tasks,
     updates,
     programs
-  restart identity
+  restart identity cascade
 `);
 
 for (const [index, program] of programs.entries()) {
   await sql.query(
     `insert into programs (
       slug, name, line, meta, stage, status, filled, total, eyebrow, title,
-      delivery_label, delivery_date, phase, week_note, week_author, ship_to, ship_note, sort_order
+      delivery_label, delivery_date, phase, week_note, week_author, ship_to, ship_note, school_slug, sort_order
     ) values (
       $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-      $11, $12, $13, $14, $15, $16, $17, $18
+      $11, $12, $13, $14, $15, $16, $17, $18, $19
     )`,
     [
       program.slug,
@@ -84,6 +85,7 @@ for (const [index, program] of programs.entries()) {
       program.weekAuthor,
       program.shipTo,
       program.shipNote,
+      program.schoolSlug,
       index,
     ],
   );
@@ -131,8 +133,8 @@ for (const [index, program] of programs.entries()) {
 
 for (const [index, task] of needsYou.entries()) {
   await sql.query(
-    `insert into tasks (href, title, detail, badge, sort_order) values ($1, $2, $3, $4, $5)`,
-    [task.href, task.title, task.detail, task.badge, index],
+    `insert into tasks (href, title, detail, badge, program_slug, sort_order) values ($1, $2, $3, $4, $5, $6)`,
+    [task.href, task.title, task.detail, task.badge, task.programSlug, index],
   );
 }
 

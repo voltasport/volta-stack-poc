@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "tsx db/migrate.ts",
+    "db:seed": "tsx db/seed.ts",
+    "db:seed-users": "tsx db/seed-users.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -26,7 +29,9 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
     "pg": "^8.23.1",
+    "playwright": "^1.63.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

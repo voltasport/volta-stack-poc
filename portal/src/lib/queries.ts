@@ -1,8 +1,12 @@
 import type {Program, Status} from "@/lib/data";
+import type {AccessContext} from "@/lib/access";
+import {programFilterClause} from "@/lib/access";
 import {sql} from "@/lib/db";
+import {isMissingColumn} from "@/lib/db-errors";
 
 type ProgramRow = {
   slug: string;
+  school_slug: string;
   name: string;
   line: string;
   meta: string;
@@ -29,6 +33,7 @@ type ProgramRow = {
 function toProgram(row: ProgramRow): Program {
   return {
     slug: row.slug,
+    schoolSlug: row.school_slug,
     name: row.name,
     line: row.line,
     meta: row.meta,
@@ -56,6 +61,7 @@ function toProgram(row: ProgramRow): Program {
 const programQuery = `
   select
     p.slug,
+    p.school_slug,
     p.name,
     p.line,
     p.meta,
@@ -112,26 +118,79 @@ const programQuery = `
     from files
     where program_slug = p.slug
   ) files on true
+  where true
 `;
 
-export async function getPrograms() {
-  const rows = await sql().query(programQuery + " order by p.sort_order");
-  return (rows as ProgramRow[]).map(toProgram);
+const legacyProgramQuery = programQuery.replace(
+  "p.school_slug,",
+  "'slcc'::text as school_slug,",
+);
+
+async function fetchProgramRows(text: string, params: unknown[]) {
+  try {
+    return (await sql().query(text, params)) as ProgramRow[];
+  } catch (error) {
+    if (!isMissingColumn(error, "school_slug")) throw error;
+    const legacyText = text.replace(programQuery, legacyProgramQuery).replace(
+      / and p\.school_slug = \$\d+/g,
+      "",
+    );
+    const legacyParams =
+      params.length > 0 && text.includes("school_slug") ? params.slice(0, -1) : params;
+    return (await sql().query(legacyText, legacyParams)) as ProgramRow[];
+  }
 }
 
-export async function getProgram(slug: string) {
-  const rows = await sql().query(programQuery + " where p.slug = $1", [slug]);
-  const row = (rows as ProgramRow[])[0];
+export async function getPrograms(access: AccessContext, schoolSlug?: string) {
+  const filter = programFilterClause(1, access);
+  let clause = filter.clause;
+  const params = [...filter.params];
+  if (schoolSlug && schoolSlug !== "all") {
+    clause += ` and p.school_slug = $${params.length + 1}`;
+    params.push(schoolSlug);
+  }
+  const rows = await fetchProgramRows(programQuery + clause + " order by p.sort_order", params);
+  return rows.map(toProgram);
+}
+
+export async function getProgram(access: AccessContext, slug: string) {
+  const filter = programFilterClause(2, access);
+  const rows = await fetchProgramRows(programQuery + " and p.slug = $1" + filter.clause, [
+    slug,
+    ...filter.params,
+  ]);
+  const row = rows[0];
   return row ? toProgram(row) : undefined;
 }
 
-export async function getTasks() {
-  const rows = await sql()`
-    select href, title, detail, badge
-    from tasks
-    order by sort_order
-  `;
-  return rows as {href: string; title: string; detail: string; badge: "check" | "4" | "doc"}[];
+export async function getProgramSlugs(access: AccessContext): Promise<string[]> {
+  if (access.programSlugs) return access.programSlugs;
+  const rows = (await sql().query(`select slug from programs order by sort_order`)) as {slug: string}[];
+  return rows.map((row) => row.slug);
+}
+
+export async function getTasks(access: AccessContext) {
+  if (access.programSlugs !== null && access.programSlugs.length === 0) {
+    return [];
+  }
+  try {
+    const rows =
+      access.programSlugs === null
+        ? await sql().query(`select href, title, detail, badge from tasks order by sort_order`)
+        : await sql().query(
+            `select href, title, detail, badge from tasks
+             where program_slug is null or program_slug = any($1::text[])
+             order by sort_order`,
+            [access.programSlugs],
+          );
+    return rows as {href: string; title: string; detail: string; badge: "check" | "4" | "doc"}[];
+  } catch (error) {
+    if (isMissingColumn(error, "program_slug")) {
+      const rows = await sql().query(`select href, title, detail, badge from tasks order by sort_order`);
+      return rows as {href: string; title: string; detail: string; badge: "check" | "4" | "doc"}[];
+    }
+    throw error;
+  }
 }
 
 export async function getUpdates() {
@@ -145,4 +204,40 @@ export async function getUpdates() {
     text: row.text,
     when: row.when_label,
   }));
+}
+
+export async function listProgramsForAdmin() {
+  const rows = (await sql().query(
+    `select slug, name, school_slug from programs order by sort_order`,
+  )) as {slug: string; name: string; school_slug: string}[];
+  return rows;
+}
+
+export async function listPortalUsers() {
+  const rows = (await sql().query(
+    `select id, name, email, role from "user" order by email`,
+  )) as {id: string; name: string; email: string; role: string}[];
+  return rows;
+}
+
+export async function getUserAssignments(userId: string) {
+  const rows = (await sql().query(
+    `select program_slug from user_program_assignments where user_id = $1 order by program_slug`,
+    [userId],
+  )) as {program_slug: string}[];
+  return rows.map((row) => row.program_slug);
+}
+
+export async function setUserAssignments(userId: string, programSlugs: string[]) {
+  await sql().query(`delete from user_program_assignments where user_id = $1`, [userId]);
+  for (const programSlug of programSlugs) {
+    await sql().query(
+      `insert into user_program_assignments (user_id, program_slug) values ($1, $2)`,
+      [userId, programSlug],
+    );
+  }
+}
+
+export async function setUserRole(userId: string, role: string) {
+  await sql().query(`update "user" set role = $2, "updatedAt" = now() where id = $1`, [userId, role]);
 }

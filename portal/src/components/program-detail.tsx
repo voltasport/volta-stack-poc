@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import {useState} from "react";
+import {usePathname, useRouter, useSearchParams} from "next/navigation";
+import {useEffect, useState} from "react";
 import type {Program, TabId} from "@/lib/data";
-
 const tabs: {id: TabId; label: string}[] = [
   {id: "items", label: "Items"},
   {id: "roster", label: "Roster"},
@@ -14,12 +14,24 @@ const tabs: {id: TabId; label: string}[] = [
 export function ProgramDetail({
   program,
   initialTab = "items",
+  showAdminActions = false,
 }: {
   program: Program;
   initialTab?: string;
+  showAdminActions?: boolean;
 }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const search = useSearchParams();
   const start = tabs.some((tab) => tab.id === initialTab) ? (initialTab as TabId) : "items";
   const [tab, setTab] = useState<TabId>(start);
+
+  useEffect(() => {
+    const fromUrl = search.get("tab");
+    if (fromUrl && tabs.some((item) => item.id === fromUrl)) {
+      setTab(fromUrl as TabId);
+    }
+  }, [search]);
   const doneCount = program.milestones.filter((item) => item.state === "done").length;
   const progress = Math.round((doneCount / program.milestones.length) * 100);
 
@@ -31,13 +43,15 @@ export function ProgramDetail({
       <p className="mt-3 text-sm text-[#6d7b8a]">{program.eyebrow}</p>
       <div className="mt-1 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <h1 className="text-3xl font-black tracking-[-0.045em] sm:text-5xl">{program.title}</h1>
-        <div className="flex flex-wrap gap-2 sm:pt-2">
-          <Link
-            href="/store"
-            className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
-          >
-            Share status link
-          </Link>
+        <div className="flex flex-wrap items-start gap-2 sm:pt-2">
+          {showAdminActions ? (
+            <Link
+              href="/store"
+              className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
+            >
+              Share status link
+            </Link>
+          ) : null}
           <a
             href="mailto:hello@voltasport.co"
             className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
@@ -78,7 +92,14 @@ export function ProgramDetail({
           <button
             key={item.id}
             type="button"
-            onClick={() => setTab(item.id)}
+            onClick={() => {
+              setTab(item.id);
+              const params = new URLSearchParams(search.toString());
+              if (item.id === "items") params.delete("tab");
+              else params.set("tab", item.id);
+              const query = params.toString();
+              router.replace(query ? `${pathname}?${query}` : pathname, {scroll: false});
+            }}
             className={`rounded-full px-4 py-1.5 text-sm font-semibold ${
               tab === item.id ? "bg-[#122033] text-white" : "text-[#3c4a5c]"
             }`}
