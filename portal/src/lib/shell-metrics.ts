@@ -1,5 +1,5 @@
 import type {AccessContext} from "@/lib/access";
-import type {CatalogEntity} from "@/lib/entities";
+import {pendingSchool, type CatalogEntity} from "@/lib/entities";
 import {getPrograms, getTasks} from "@/lib/queries";
 
 export type ShellMetrics = {
@@ -12,7 +12,8 @@ export async function getShellMetrics(
   access: AccessContext,
   entity: CatalogEntity,
 ): Promise<ShellMetrics> {
-  const schoolFilter = entity.slug === "all" ? undefined : entity.slug;
+  const schoolFilter =
+    entity.slug === "all" || entity.slug === pendingSchool.slug ? undefined : entity.slug;
   const programs = await getPrograms(access, schoolFilter);
   const tasks = await getTasks(access);
   const scopedSlugs = new Set(programs.map((program) => program.slug));

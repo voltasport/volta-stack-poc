@@ -9,6 +9,8 @@ export function LoginForm() {
   const search = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const prefilledEmail = search.get("email") ?? "";
+  const passwordJustSet = search.get("passwordSet") === "1";
 
   return (
     <form
@@ -30,6 +32,11 @@ export function LoginForm() {
         router.refresh();
       }}
     >
+      {passwordJustSet ? (
+        <p className="rounded-xl bg-[#e5f6ea] px-3 py-2 text-sm font-semibold text-[#187243]">
+          Password set — sign in with your email and new password.
+        </p>
+      ) : null}
       <label className="flex flex-col gap-1 text-sm font-semibold">
         Email
         <input
@@ -37,6 +44,7 @@ export function LoginForm() {
           type="email"
           required
           autoComplete="email"
+          defaultValue={prefilledEmail}
           className="rounded-xl border border-[#d9d3c8] px-3 py-2 font-normal"
         />
       </label>

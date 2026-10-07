@@ -61,6 +61,15 @@ export const allSchools: CatalogEntity = {
   match: null,
 };
 
+/** Scoped users with no program assignments yet — not a real school. */
+export const pendingSchool: CatalogEntity = {
+  slug: "pending",
+  name: "No school assigned yet",
+  short: "—",
+  programs: false,
+  match: null,
+};
+
 /** Schools/orgs in the sidebar picker — not “All schools”, not the catalog-only “other” bucket. */
 export function sidebarSchoolEntities(): CatalogEntity[] {
   return entities.filter((entity) => entity.slug !== "other");
@@ -68,7 +77,12 @@ export function sidebarSchoolEntities(): CatalogEntity[] {
 
 export function entityBySlug(slug: string | undefined) {
   if (slug === allSchools.slug) return allSchools;
-  return entities.find((entity) => entity.slug === slug) ?? entities[0];
+  if (slug === pendingSchool.slug) return pendingSchool;
+  if (slug) {
+    const found = entities.find((entity) => entity.slug === slug);
+    if (found) return found;
+  }
+  return pendingSchool;
 }
 
 export function entityForProduct(title: string, vendor: string) {

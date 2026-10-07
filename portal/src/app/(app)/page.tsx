@@ -1,8 +1,11 @@
 import Link from "next/link";
 import {getUpdates} from "@/lib/queries";
 import {AdminActions, Segments, Shell, StatusPill} from "@/components/shell";
-import {allSchools, entities, productsForEntity} from "@/lib/entities";
+import {EmptyPage} from "@/components/portal-empty-states";
+import {isPendingAccess} from "@/lib/access";
+import {allSchools, entities, pendingSchool, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
+import {firstNameFromUser, overviewDateLine} from "@/lib/display-name";
 import {loadPortalPage} from "@/lib/page-shell";
 
 export const dynamic = "force-dynamic";
@@ -10,16 +13,33 @@ export const dynamic = "force-dynamic";
 export default async function OverviewPage() {
   const {access, entity, programs, tasks, shellConfig} = await loadPortalPage();
   const updates = await getUpdates();
+  const firstName = firstNameFromUser(access.name, access.email);
+
+  if (isPendingAccess(access) || entity.slug === pendingSchool.slug) {
+    return (
+      <Shell config={shellConfig}>
+        <EmptyPage title={`Welcome, ${firstName}`}>
+          <p>
+            Welcome to Volta — your portal is being set up. Your Volta rep will connect your
+            programs shortly.
+          </p>
+          <p className="mt-3">
+            When programs are assigned, you&apos;ll see rosters, proofs, and team stores here.
+          </p>
+        </EmptyPage>
+      </Shell>
+    );
+  }
 
   if (programs.length === 0 && entity.slug !== allSchools.slug) {
     return (
       <Shell config={shellConfig}>
-        <p className="text-sm text-[#6d7b8a]">{entity.name}</p>
-        <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">NO PROGRAMS YET</h1>
-        <p className="mt-4 max-w-xl text-sm leading-6 text-[#3c4a5c]">
-          No programs are assigned to your account for {entity.name}. Team gear may still appear
-          under Team stores.
-        </p>
+        <EmptyPage eyebrow={entity.name} title="No programs yet">
+          <p>
+            No programs are linked to your account for {entity.name} yet. Your Volta rep can add
+            them, or switch schools in the sidebar if you work with multiple teams.
+          </p>
+        </EmptyPage>
       </Shell>
     );
   }
@@ -37,16 +57,19 @@ export default async function OverviewPage() {
       }))
     : [];
 
-  const inProduction = programs.filter((program) => program.status === "On track" || program.phase.includes("PRODUCTION")).length;
-  const nextDelivery = programs.find((program) => program.deliveryDate !== "TBD")?.deliveryDate ?? "—";
+  const inProduction = programs.filter(
+    (program) => program.status === "On track" || program.phase.includes("PRODUCTION"),
+  ).length;
+  const nextDelivery =
+    programs.find((program) => program.deliveryDate !== "TBD")?.deliveryDate ?? "—";
 
   return (
     <Shell config={shellConfig}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         <div className="min-w-0">
-          <p className="text-sm text-[#6d7b8a]">Saturday, Oct 3</p>
+          <p className="text-sm text-[#6d7b8a]">{overviewDateLine()}</p>
           <h1 className="mt-1 text-3xl font-black tracking-[-0.045em] text-[#101828] sm:text-5xl">
-            MORNING, BARBIE.
+            Hello, {firstName}
           </h1>
         </div>
         <AdminActions show={shellConfig.showAdminActions} />
@@ -64,7 +87,7 @@ export default async function OverviewPage() {
                   {school.programCount
                     ? `${school.programCount} programs${school.count ? ` · ${school.count} products` : ""}`
                     : school.count === 0
-                      ? "No retail products"
+                      ? "No team store products yet"
                       : `${school.count} products`}
                 </p>
               </li>
@@ -78,7 +101,7 @@ export default async function OverviewPage() {
         <Stat label="Next delivery" value={nextDelivery} />
         <div className="rounded-3xl bg-[#0e1c30] px-5 py-4 text-white">
           <p className="text-xs text-[#b7c6d4]">Saved vs. dealer this year</p>
-          <p className="mt-3 text-4xl font-black tracking-tight text-[#3ee58a]">$18.4K</p>
+          <p className="mt-3 text-4xl font-black tracking-tight text-[#3ee58a]">—</p>
         </div>
       </div>
 
@@ -90,27 +113,31 @@ export default async function OverviewPage() {
               View all
             </Link>
           </div>
-          <ul>
-            {programs.map((program) => (
-              <li key={program.slug} className="border-t border-[#f0ece4] first:border-t-0">
-                <Link
-                  href={`/programs/${program.slug}`}
-                  className="grid grid-cols-1 items-start gap-2 py-3 sm:grid-cols-[1.2fr_1.1fr_auto_auto] sm:items-center sm:gap-3"
-                >
-                  <span>
-                    <span className="block text-sm font-semibold">{program.name}</span>
-                    <span className="block text-xs text-[#7b8794]">{program.line}</span>
-                  </span>
-                  <span>
-                    <Segments filled={program.filled} total={program.total} />
-                    <span className="mt-1 block text-xs text-[#7b8794]">{program.stage}</span>
-                  </span>
-                  <StatusPill status={program.status} />
-                  <span className="text-[#98a2b0]">→</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          {programs.length === 0 ? (
+            <p className="text-sm text-[#3c4a5c]">No programs in this view yet.</p>
+          ) : (
+            <ul>
+              {programs.map((program) => (
+                <li key={program.slug} className="border-t border-[#f0ece4] first:border-t-0">
+                  <Link
+                    href={`/programs/${program.slug}`}
+                    className="grid grid-cols-1 items-start gap-2 py-3 sm:grid-cols-[1.2fr_1.1fr_auto_auto] sm:items-center sm:gap-3"
+                  >
+                    <span>
+                      <span className="block text-sm font-semibold">{program.name}</span>
+                      <span className="block text-xs text-[#7b8794]">{program.line}</span>
+                    </span>
+                    <span>
+                      <Segments filled={program.filled} total={program.total} />
+                      <span className="mt-1 block text-xs text-[#7b8794]">{program.stage}</span>
+                    </span>
+                    <StatusPill status={program.status} />
+                    <span className="text-[#98a2b0]">→</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <div className="flex flex-col gap-4">
@@ -119,22 +146,26 @@ export default async function OverviewPage() {
               <h2 className="text-sm font-extrabold tracking-[0.08em]">NEEDS YOU</h2>
               <span className="h-2 w-2 rounded-full bg-[#3dcb7a]" />
             </div>
-            <ul className="flex flex-col gap-2">
-              {tasks.map((item) => (
-                <li key={item.title}>
-                  <Link
-                    href={item.href}
-                    className="flex items-center gap-3 rounded-2xl bg-[#173049] px-3 py-3"
-                  >
-                    <Badge kind={item.badge} />
-                    <span>
-                      <span className="block text-sm font-semibold">{item.title}</span>
-                      <span className="block text-xs text-[#9eb0c2]">{item.detail}</span>
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            {tasks.length === 0 ? (
+              <p className="text-sm text-[#9eb0c2]">Nothing needs your attention right now.</p>
+            ) : (
+              <ul className="flex flex-col gap-2">
+                {tasks.map((item) => (
+                  <li key={item.title}>
+                    <Link
+                      href={item.href}
+                      className="flex items-center gap-3 rounded-2xl bg-[#173049] px-3 py-3"
+                    >
+                      <Badge kind={item.badge} />
+                      <span>
+                        <span className="block text-sm font-semibold">{item.title}</span>
+                        <span className="block text-xs text-[#9eb0c2]">{item.detail}</span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section className="rounded-3xl bg-white p-5">

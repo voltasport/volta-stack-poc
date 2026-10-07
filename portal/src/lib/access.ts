@@ -3,6 +3,7 @@ import {notFound, redirect} from "next/navigation";
 import {
   allSchools,
   entityBySlug,
+  pendingSchool,
   sidebarSchoolEntities,
   type CatalogEntity,
 } from "@/lib/entities";
@@ -15,6 +16,7 @@ export type AccessContext = {
   userId: string;
   role: PortalRole;
   email: string;
+  name: string;
   /** null = unrestricted (admin). */
   programSlugs: string[] | null;
   schoolSlugs: string[] | null;
@@ -59,12 +61,14 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const role = parsePortalRole(session.user.role as string | undefined);
   const userId = session.user.id;
   const email = session.user.email;
+  const name = session.user.name ?? email;
 
   if (role === "admin") {
     return {
       userId,
       role,
       email,
+      name,
       programSlugs: null,
       schoolSlugs: null,
       entities: sidebarSchoolEntities(),
@@ -87,6 +91,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     userId,
     role,
     email,
+    name,
     programSlugs: preMigration ? null : programSlugs,
     schoolSlugs: preMigration ? null : schoolSlugs,
     entities: preMigration ? sidebarSchoolEntities() : allowedEntities,
@@ -129,13 +134,25 @@ export async function assertProgramAccess(access: AccessContext, slug: string) {
   if (!access.programSlugs.includes(slug)) notFound();
 }
 
+/** Director/manager with zero program assignments (post-migration). */
+export function isPendingAccess(access: AccessContext) {
+  return (
+    !access.canSeeAllSchools &&
+    !access.preMigrationMode &&
+    access.entities.length === 0
+  );
+}
+
 export async function resolveCurrentEntity(access: AccessContext): Promise<CatalogEntity> {
+  if (isPendingAccess(access)) return pendingSchool;
+
   const jar = await cookies();
   const slug = jar.get("volta_entity")?.value;
 
   if (slug === allSchools.slug) {
     if (access.canSeeAllSchools) return allSchools;
-    return access.entities[0] ?? entityBySlug(undefined);
+    if (access.entities[0]) return access.entities[0];
+    return pendingSchool;
   }
 
   if (slug && access.entities.some((entity) => entity.slug === slug)) {
@@ -143,12 +160,15 @@ export async function resolveCurrentEntity(access: AccessContext): Promise<Catal
   }
 
   if (access.canSeeAllSchools) return allSchools;
-  return access.entities[0] ?? entityBySlug(undefined);
+  if (access.entities[0]) return access.entities[0];
+  return pendingSchool;
 }
 
 export function schoolFilterForStore(access: AccessContext, entitySlug: string) {
+  if (entitySlug === pendingSchool.slug || isPendingAccess(access)) return null;
   if (access.role === "admin" && entitySlug === allSchools.slug) return null;
   if (access.schoolSlugs === null) return entitySlug === allSchools.slug ? null : entitySlug;
+  if (access.schoolSlugs.length === 0) return null;
   if (!access.schoolSlugs.includes(entitySlug)) notFound();
   return entitySlug;
 }

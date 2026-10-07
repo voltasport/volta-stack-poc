@@ -56,10 +56,9 @@ export function UsersAdmin({
             setMessage(payload.error ?? "Could not create user");
             return;
           }
-          setMessage(`Created ${payload.user.email}`);
-          if (payload.tempPassword) {
-            setLink(`Temporary password (share securely): ${payload.tempPassword}`);
-          }
+          setMessage(
+            `Created ${payload.user.email}. Use “Copy set-password link” below to invite them.`,
+          );
           router.refresh();
         }}
       >

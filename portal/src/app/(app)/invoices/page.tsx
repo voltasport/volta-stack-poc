@@ -1,5 +1,8 @@
 import Link from "next/link";
 import {Shell} from "@/components/shell";
+import {EmptyPage} from "@/components/portal-empty-states";
+import {isPendingAccess} from "@/lib/access";
+import {allSchools, pendingSchool} from "@/lib/entities";
 import {loadPortalPage} from "@/lib/page-shell";
 import {getPrograms} from "@/lib/queries";
 
@@ -7,7 +10,22 @@ export const dynamic = "force-dynamic";
 
 export default async function InvoicesPage() {
   const {access, entity, shellConfig} = await loadPortalPage();
-  const programs = await getPrograms(access, entity.slug === "all" ? undefined : entity.slug);
+
+  if (isPendingAccess(access) || entity.slug === pendingSchool.slug) {
+    return (
+      <Shell config={shellConfig}>
+        <EmptyPage title="Invoices">
+          <p>Invoices will appear here once programs are assigned to your account.</p>
+        </EmptyPage>
+      </Shell>
+    );
+  }
+
+  const schoolFilter =
+    entity.slug === allSchools.slug || entity.slug === pendingSchool.slug
+      ? undefined
+      : entity.slug;
+  const programs = await getPrograms(access, schoolFilter);
   const invoices = programs.flatMap((program) =>
     program.files
       .filter((file) => /invoice/i.test(file.name))
