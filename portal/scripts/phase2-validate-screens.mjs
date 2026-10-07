@@ -46,31 +46,6 @@ const benCtx = await browser.newContext();
 const benPage = await benCtx.newPage();
 await login(benCtx, BEN.email, BEN.password);
 
-await benCtx.request.post(`${base}/api/programs`, {
-  data: {
-    name: "And Collar Academy Soccer",
-    sport: "Soccer",
-    levelOrSeason: "Varsity · Fall 2026",
-    rosterSize: 22,
-  },
-});
-
-const pool2 = new Pool({connectionString: process.env.DATABASE_URL});
-const benSlug = (
-  await pool2.query(
-    `select program_slug from user_program_assignments a
-     join "user" u on u.id = a.user_id where u.email = $1 order by a.created_at desc limit 1`,
-    [BEN.email],
-  )
-).rows[0]?.program_slug;
-
-if (benSlug) {
-  await benCtx.request.post(`${base}/api/programs/${benSlug}/roster`, {
-    data: {paste: "Name,Number\nAlex,10\nJordan,7", mode: "append"},
-  });
-}
-await pool2.end();
-
 const adminCtx = await browser.newContext();
 const adminPage = await adminCtx.newPage();
 await login(adminCtx, LOCAL_TEST_ADMIN_EMAIL, passwords.admin);
@@ -101,6 +76,31 @@ shots.push(await shot(adminPage, "phase2-admin-programs-new-button"));
 await benPage.goto(`${base}/`, {waitUntil: "networkidle"});
 shots.push(await shot(benPage, "phase2-ben-checklist-overview"));
 shots.push(await shot(benPage, "phase2-ben-checklist-mobile", true));
+
+await benCtx.request.post(`${base}/api/programs`, {
+  data: {
+    name: "And Collar Academy Soccer",
+    sport: "Soccer",
+    levelOrSeason: "Varsity · Fall 2026",
+    rosterSize: 22,
+  },
+});
+
+const pool2 = new Pool({connectionString: process.env.DATABASE_URL});
+const benSlug = (
+  await pool2.query(
+    `select program_slug from user_program_assignments a
+     join "user" u on u.id = a.user_id where u.email = $1 order by a.created_at desc limit 1`,
+    [BEN.email],
+  )
+).rows[0]?.program_slug;
+
+if (benSlug) {
+  await benCtx.request.post(`${base}/api/programs/${benSlug}/roster`, {
+    data: {paste: "Name,Number\nAlex,10\nJordan,7", mode: "append"},
+  });
+}
+await pool2.end();
 
 if (benSlug) {
   await benPage.goto(`${base}/programs/${benSlug}?tab=roster`, {waitUntil: "networkidle"});
