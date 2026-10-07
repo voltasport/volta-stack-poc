@@ -1,4 +1,5 @@
 import Link from "next/link";
+import {MarketingHeader} from "@/components/marketing-header";
 import {portalLoginUrl} from "@/lib/site-urls";
 
 const links = [
@@ -8,40 +9,11 @@ const links = [
   {href: "/about", label: "About"},
 ];
 
-export function SiteHeader() {
+export function SiteHeader({active}: {active?: string}) {
   return (
     <section style={{background: "#101B2D", color: "#F6F4F0", padding: "20px 0 0"}}>
       <div className="wrap">
-        <header
-          className="site-header-pill"
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 12,
-            background: "rgba(31,48,75,.7)",
-            border: "1px solid #26395A",
-            borderRadius: 999,
-            padding: "8px 8px 8px 24px",
-          }}
-        >
-          <Link href="/" aria-label="Volta home" style={{textDecoration: "none", color: "#F6F4F0"}}>
-            <span className="disp" style={{fontSize: 30, letterSpacing: ".05em"}}>
-              Volta
-            </span>
-          </Link>
-          <nav aria-label="Main" style={{display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2}}>
-            {links.map((link) => (
-              <Link key={link.href} className="nl" href={link.href}>
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <Link className="btn btn-g" href="/consult" style={{minHeight: 44}}>
-            Book a consult
-          </Link>
-        </header>
+        <MarketingHeader active={active} />
       </div>
     </section>
   );
@@ -59,11 +31,11 @@ export function SiteFooter() {
         </span>
         <nav aria-label="Footer" style={{display: "flex", flexWrap: "wrap", gap: 24}}>
           {links.map((link) => (
-            <Link key={link.href} href={link.href} style={{color: "#4A5566", textDecoration: "none"}}>
+            <Link key={link.href} href={link.href} className="link-muted">
               {link.label}
             </Link>
           ))}
-          <Link href="/consult" style={{color: "#4A5566", textDecoration: "none"}}>
+          <Link href="/consult" className="link-muted">
             Contact
           </Link>
           <Link href={portalLoginUrl} className="link-muted">

@@ -4,14 +4,14 @@ import {SiteFooter, SiteHeader} from "@/components/site-frame";
 export default function ConsultPage() {
   return (
     <div style={{minHeight: "100vh", background: "#F6F4F0"}}>
-      <SiteHeader />
+      <SiteHeader active="/consult" />
       <section style={{padding: "72px 0 96px"}}>
         <div className="wrap consult-grid" style={{display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(280px,420px)", gap: 48}}>
           <div>
             <p className="eyebrow" style={{color: "#2E7A4A"}}>
               <span className="dot" /> Book a consult
             </p>
-            <h1 className="disp" style={{margin: "16px 0 0", fontSize: "clamp(64px,8vw,112px)", color: "#101B2D"}}>
+            <h1 className="disp headline-page" style={{margin: "16px 0 0", color: "#101B2D"}}>
               Let&apos;s talk kit.
             </h1>
             <p style={{fontSize: 20, lineHeight: 1.5, maxWidth: 460}}>

@@ -1,12 +1,16 @@
-/** Production URLs — set NEXT_PUBLIC_PORTAL_URL in deploy when the portal host differs. */
-const DEFAULT_PORTAL = "https://app.voltasport.co";
-
+/** Production URLs — override with env in deploy. API host may differ from public login host. */
 function normalizeBase(url: string) {
   return url.replace(/\/$/, "");
 }
 
-export const portalApiOrigin = normalizeBase(
-  process.env.NEXT_PUBLIC_PORTAL_URL ?? process.env.PORTAL_ORIGIN ?? DEFAULT_PORTAL,
-);
+/** User-facing program portal login (no platform hostnames in UI). */
+export const portalLoginUrl = `${normalizeBase(
+  process.env.NEXT_PUBLIC_PORTAL_URL ?? "https://app.voltasport.co",
+)}/login`;
 
-export const portalLoginUrl = `${portalApiOrigin}/login`;
+/** Server/catalog API origin (defaults to live portal API when env is unset). */
+export const portalApiOrigin = normalizeBase(
+  process.env.PORTAL_ORIGIN ??
+    process.env.NEXT_PUBLIC_PORTAL_URL ??
+    "https://voltasport.vercel.app",
+);
