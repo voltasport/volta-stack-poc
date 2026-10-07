@@ -2,19 +2,46 @@
 
 import {useRouter} from "next/navigation";
 import {useState} from "react";
-import {portalRoles, type PortalRole} from "@/lib/roles";
+import {portalRoles} from "@/lib/roles";
+import {inviteLifecycleStatus} from "@/lib/portal-invite-status";
 
-type UserRow = {id: string; name: string; email: string; role: string};
+type PortalUserInviteRow = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  invited_at: string | null;
+  last_invite_sent_at: string | null;
+  first_login_at: string | null;
+  onboarding_dismissed_at: string | null;
+};
+
 type ProgramRow = {slug: string; name: string; school_slug: string};
+
+function statusLabel(status: ReturnType<typeof inviteLifecycleStatus>) {
+  if (status === "active") return "Active";
+  if (status === "invited") return "Invited";
+  return "Never sent";
+}
+
+function statusClass(status: ReturnType<typeof inviteLifecycleStatus>) {
+  if (status === "active") return "bg-[#e5f6ea] text-[#187243]";
+  if (status === "invited") return "bg-[#e8eef6] text-[#3d5678]";
+  return "bg-[#eef1f4] text-[#3c4a5c]";
+}
 
 export function UsersAdmin({
   users,
   programs,
   assignments,
+  inviteColumnsReady,
+  emailConfigured,
 }: {
-  users: UserRow[];
+  users: PortalUserInviteRow[];
   programs: ProgramRow[];
   assignments: Record<string, string[]>;
+  inviteColumnsReady: boolean;
+  emailConfigured: boolean;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -25,9 +52,16 @@ export function UsersAdmin({
     <div>
       <h1 className="text-4xl font-black tracking-[-0.04em]">USERS</h1>
       <p className="mt-2 max-w-2xl text-sm leading-6 text-[#3c4a5c]">
-        Create accounts, set roles, assign programs, and copy invite or password-reset links to send
-        manually.
+        Create accounts, assign programs, and send portal invites.{" "}
+        {emailConfigured
+          ? "Invite emails send automatically when you create a user or click Send invite."
+          : "Email not configured — copy set-password links instead."}
       </p>
+      {!inviteColumnsReady ? (
+        <p className="mt-3 rounded-2xl bg-[#f8efd0] px-4 py-3 text-sm text-[#6d5a14]">
+          Invite status requires migration 003. Run <code className="text-xs">npm run db:migrate</code>.
+        </p>
+      ) : null}
       {message ? <p className="mt-4 text-sm font-semibold text-[#187243]">{message}</p> : null}
       {link ? (
         <p className="mt-2 break-all rounded-2xl bg-white px-4 py-3 text-sm text-[#122033]">{link}</p>
@@ -56,9 +90,13 @@ export function UsersAdmin({
             setMessage(payload.error ?? "Could not create user");
             return;
           }
+          const invite = payload.invite as {detail?: string; url?: string; emailSent?: boolean} | undefined;
           setMessage(
-            `Created ${payload.user.email}. Use “Copy set-password link” below to invite them.`,
+            invite?.emailSent
+              ? `Created ${payload.user.email}. ${invite.detail ?? "Invite sent."}`
+              : `Created ${payload.user.email}. ${invite?.detail ?? "Use Send invite or copy the link below."}`,
           );
+          if (invite?.url && !invite.emailSent) setLink(invite.url);
           router.refresh();
         }}
       >
@@ -88,86 +126,123 @@ export function UsersAdmin({
       </form>
 
       <ul className="mt-8 flex flex-col gap-4">
-        {users.map((user) => (
-          <li key={user.id} className="rounded-3xl bg-white p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{user.name}</p>
-                <p className="text-sm text-[#6d7b8a]">{user.email}</p>
+        {users.map((user) => {
+          const lifecycle = inviteLifecycleStatus(user);
+          return (
+            <li key={user.id} className="rounded-3xl bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold">{user.name}</p>
+                  <p className="text-sm text-[#6d7b8a]">{user.email}</p>
+                  {inviteColumnsReady ? (
+                    <span
+                      className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass(lifecycle)}`}
+                    >
+                      {statusLabel(lifecycle)}
+                    </span>
+                  ) : null}
+                </div>
+                <select
+                  className="rounded-xl border px-3 py-1.5 text-sm capitalize"
+                  defaultValue={user.role}
+                  onChange={async (event) => {
+                    await fetch(`/api/admin/users/${user.id}`, {
+                      method: "PATCH",
+                      headers: {"Content-Type": "application/json"},
+                      body: JSON.stringify({role: event.target.value}),
+                    });
+                    router.refresh();
+                  }}
+                >
+                  {portalRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <select
-                className="rounded-xl border px-3 py-1.5 text-sm capitalize"
-                defaultValue={user.role}
-                onChange={async (event) => {
-                  await fetch(`/api/admin/users/${user.id}`, {
-                    method: "PATCH",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({role: event.target.value}),
-                  });
-                  router.refresh();
-                }}
-              >
-                {portalRoles.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {user.role !== "admin" ? (
-              <div className="mt-4">
-                <p className="text-xs font-extrabold tracking-[0.08em] text-[#6d7b8a]">PROGRAMS</p>
-                <ul className="mt-2 flex flex-col gap-1 text-sm">
-                  {programs.map((program) => {
-                    const checked = assignments[user.id]?.includes(program.slug) ?? false;
-                    return (
-                      <li key={program.slug}>
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            defaultChecked={checked}
-                            onChange={async (event) => {
-                              const next = new Set(assignments[user.id] ?? []);
-                              if (event.target.checked) next.add(program.slug);
-                              else next.delete(program.slug);
-                              await fetch(`/api/admin/users/${user.id}`, {
-                                method: "PATCH",
-                                headers: {"Content-Type": "application/json"},
-                                body: JSON.stringify({programSlugs: [...next]}),
-                              });
-                              router.refresh();
-                            }}
-                          />
-                          {program.name}{" "}
-                          <span className="text-[#6d7b8a]">({program.school_slug})</span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
+              {user.role !== "admin" ? (
+                <div className="mt-4">
+                  <p className="text-xs font-extrabold tracking-[0.08em] text-[#6d7b8a]">PROGRAMS</p>
+                  <ul className="mt-2 flex flex-col gap-1 text-sm">
+                    {programs.map((program) => {
+                      const checked = assignments[user.id]?.includes(program.slug) ?? false;
+                      return (
+                        <li key={program.slug}>
+                          <label className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              defaultChecked={checked}
+                              onChange={async (event) => {
+                                const next = new Set(assignments[user.id] ?? []);
+                                if (event.target.checked) next.add(program.slug);
+                                else next.delete(program.slug);
+                                await fetch(`/api/admin/users/${user.id}`, {
+                                  method: "PATCH",
+                                  headers: {"Content-Type": "application/json"},
+                                  body: JSON.stringify({programSlugs: [...next]}),
+                                });
+                                router.refresh();
+                              }}
+                            />
+                            {program.name}{" "}
+                            <span className="text-[#6d7b8a]">({program.school_slug})</span>
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ) : null}
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  className="rounded-full bg-[#122033] px-3 py-1.5 text-sm font-semibold text-white"
+                  onClick={async () => {
+                    setLink(null);
+                    const response = await fetch(`/api/admin/users/${user.id}/invite`, {
+                      method: "POST",
+                      headers: {"Content-Type": "application/json"},
+                      body: JSON.stringify({sendEmail: true}),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                      setMessage(payload.error ?? "Could not send invite");
+                      return;
+                    }
+                    setMessage(`${user.email}: ${payload.detail ?? "Invite sent."}`);
+                    if (payload.url && !payload.emailSent) setLink(payload.url);
+                    router.refresh();
+                  }}
+                >
+                  {lifecycle === "never_sent" ? "Send invite" : "Resend invite"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[#e4dfd6] px-3 py-1.5 text-sm font-semibold"
+                  onClick={async () => {
+                    setLink(null);
+                    const response = await fetch(`/api/admin/users/${user.id}/invite`, {
+                      method: "POST",
+                      headers: {"Content-Type": "application/json"},
+                      body: JSON.stringify({sendEmail: false}),
+                    });
+                    const payload = await response.json();
+                    if (!response.ok) {
+                      setMessage(payload.error ?? "Could not create invite link");
+                      return;
+                    }
+                    setMessage(`Set-password link for ${user.email}`);
+                    setLink(payload.url);
+                    router.refresh();
+                  }}
+                >
+                  Copy set-password link
+                </button>
               </div>
-            ) : null}
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-full border border-[#e4dfd6] px-3 py-1.5 text-sm font-semibold"
-                onClick={async () => {
-                  setLink(null);
-                  const response = await fetch(`/api/admin/users/${user.id}/invite`, {method: "POST"});
-                  const payload = await response.json();
-                  if (!response.ok) {
-                    setMessage(payload.error ?? "Could not create invite link");
-                    return;
-                  }
-                  setMessage(`Invite / reset link for ${user.email}`);
-                  setLink(payload.url);
-                }}
-              >
-                Copy set-password link
-              </button>
-            </div>
-          </li>
-        ))}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

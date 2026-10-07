@@ -10,6 +10,8 @@ import {
 import {sql} from "@/lib/db";
 import {isMissingTable} from "@/lib/db-errors";
 import {parsePortalRole, type PortalRole} from "@/lib/roles";
+import {loadOnboardingDismissed, touchFirstLogin} from "@/lib/portal-invites";
+import {portalRequestsTableReady} from "@/lib/portal-requests";
 import {currentSession} from "@/lib/session";
 
 export type AccessContext = {
@@ -26,8 +28,11 @@ export type AccessContext = {
   showApprovals: boolean;
   showArtworkLocker: boolean;
   showUsersNav: boolean;
+  showRequestsNav: boolean;
+  showOnboardingChecklist: boolean;
   /** True when assignment table is missing — login works; run db:migrate for scoping. */
   preMigrationMode: boolean;
+  requestsReady: boolean;
 };
 
 async function loadProgramSlugs(userId: string): Promise<{slugs: string[]; preMigration: boolean}> {
@@ -62,6 +67,9 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const userId = session.user.id;
   const email = session.user.email;
   const name = session.user.name ?? email;
+  await touchFirstLogin(userId);
+  const requestsReady = await portalRequestsTableReady();
+  const onboardingDismissed = await loadOnboardingDismissed(userId);
 
   if (role === "admin") {
     return {
@@ -77,7 +85,10 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showApprovals: true,
       showArtworkLocker: true,
       showUsersNav: true,
+      showRequestsNav: requestsReady,
+      showOnboardingChecklist: false,
       preMigrationMode: false,
+      requestsReady,
     };
   }
 
@@ -100,7 +111,11 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     showApprovals: false,
     showArtworkLocker: false,
     showUsersNav: false,
+    showRequestsNav: false,
+    showOnboardingChecklist:
+      (role === "director" || role === "manager") && !onboardingDismissed,
     preMigrationMode: preMigration,
+    requestsReady,
   };
 }
 
