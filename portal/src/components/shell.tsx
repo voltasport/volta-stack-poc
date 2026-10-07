@@ -4,9 +4,9 @@ import Link from "next/link";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {Suspense, useCallback, useEffect, useState} from "react";
 import {signOut} from "@/lib/auth-client";
-import {allSchools, entityBySlug, type CatalogEntity} from "@/lib/entities";
+import {allSchools, entityBySlug} from "@/lib/entities";
 import {navItemActive, type NavItem} from "@/lib/shell-nav";
-import type {ShellConfig} from "@/lib/shell-config";
+import type {ShellConfig, ShellEntity} from "@/lib/shell-config";
 
 const SIDEBAR_STORAGE_KEY = "volta-sidebar-collapsed";
 const SIDEBAR_WIDTH = 240;
@@ -19,7 +19,7 @@ function EntitySwitcher({
   onChange,
 }: {
   slug: string;
-  choices: CatalogEntity[];
+  choices: ShellEntity[];
   collapsed: boolean;
   onChange: (slug: string) => void;
 }) {
@@ -111,12 +111,11 @@ function SidebarPanel({
         <button
           type="button"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           onClick={onToggleCollapsed}
-          className={`hidden shrink-0 rounded-lg text-xs font-semibold text-[#9eb0c2] hover:bg-white/5 hover:text-white lg:block ${
-            collapsed ? "grid h-8 w-8 place-items-center" : "px-2 py-1.5"
-          }`}
+          className="hidden h-8 w-8 shrink-0 place-items-center rounded-lg text-base font-semibold leading-none text-[#9eb0c2] hover:bg-white/5 hover:text-white lg:grid"
         >
-          {collapsed ? "»" : "Collapse «"}
+          <span aria-hidden="true">{collapsed ? "»" : "«"}</span>
         </button>
       </div>
 
@@ -271,12 +270,12 @@ export function Shell({
           } as React.CSSProperties
         }
       >
-        <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-[#e4dfd4] bg-[#f7f4ee] px-4 py-2 text-xs text-[#5d6b7a] sm:px-6">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[#e4dfd4] bg-[#f7f4ee] px-4 py-2 text-xs text-[#5d6b7a] lg:hidden sm:px-6">
           <button
             type="button"
             aria-label="Open menu"
             aria-expanded={mobileOpen}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#e4dfd4] bg-white text-[#122033] lg:hidden"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#e4dfd4] bg-white text-[#122033]"
             onClick={() => setMobileOpen(true)}
           >
             <span className="flex flex-col gap-1">
@@ -285,18 +284,11 @@ export function Shell({
               <span className="block h-0.5 w-4 rounded-full bg-current" />
             </span>
           </button>
-          <p className="min-w-0 flex-1 leading-snug">
-            <span className="font-semibold text-[#122033]">Volta portal.</span>{" "}
-            <span className="hidden sm:inline">
-              Programs, proofs, rosters, and team stores for your schools.
-            </span>
-          </p>
           <a
             href="https://voltasport.co"
             className="shrink-0 font-semibold text-[#147a45] underline-offset-2 hover:underline"
           >
-            <span className="hidden sm:inline">Volta Sport home</span>
-            <span className="sm:hidden">Home</span>
+            Home
           </a>
         </div>
         <div className={`min-w-0 flex-1 ${flush ? "" : "px-4 py-5 sm:px-6"}`}>{children}</div>
