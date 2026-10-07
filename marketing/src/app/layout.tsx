@@ -1,6 +1,7 @@
 import type {Metadata} from "next";
 import type {ReactNode} from "react";
 import {Archivo, Inter} from "next/font/google";
+import {ScrollReveal} from "@/components/scroll-reveal";
 import "./globals.css";
 
 const inter = Inter({subsets: ["latin"], variable: "--font-inter"});
@@ -14,7 +15,10 @@ export const metadata: Metadata = {
 export default function RootLayout({children}: {children: ReactNode}) {
   return (
     <html lang="en" className={`${inter.variable} ${archivo.variable}`}>
-      <body>{children}</body>
+      <body>
+        <ScrollReveal />
+        {children}
+      </body>
     </html>
   );
 }

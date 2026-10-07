@@ -14,6 +14,7 @@ export function SiteHeader() {
     <section style={{background: "#101B2D", color: "#F6F4F0", padding: "20px 0 0"}}>
       <div className="wrap">
         <header
+          className="site-header-pill"
           style={{
             display: "flex",
             flexWrap: "wrap",

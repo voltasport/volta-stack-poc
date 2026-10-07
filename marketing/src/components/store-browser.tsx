@@ -21,7 +21,7 @@ export function StoreBrowser({
   const total = lines.reduce((sum, product) => sum + Number(product.price) * cart[product.id], 0);
 
   return (
-    <div style={{display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16}}>
+    <div className="store-layout" style={{display: "grid", gridTemplateColumns: "minmax(0,1fr) 280px", gap: 16}}>
       <ul style={{display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(220px,1fr))", gap: 16, listStyle: "none", margin: 0, padding: 0}}>
         {products.map((product) => (
           <li key={product.id} style={{background: "#fff", borderRadius: 24, padding: 16}}>

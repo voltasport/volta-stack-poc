@@ -6,7 +6,7 @@ export default function ConsultPage() {
     <div style={{minHeight: "100vh", background: "#F6F4F0"}}>
       <SiteHeader />
       <section style={{padding: "72px 0 96px"}}>
-        <div className="wrap" style={{display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(280px,420px)", gap: 48}}>
+        <div className="wrap consult-grid" style={{display: "grid", gridTemplateColumns: "minmax(0,1fr) minmax(280px,420px)", gap: 48}}>
           <div>
             <p className="eyebrow" style={{color: "#2E7A4A"}}>
               <span className="dot" /> Book a consult
