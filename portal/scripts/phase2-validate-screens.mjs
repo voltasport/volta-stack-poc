@@ -79,6 +79,15 @@ const benId = (await pool2.query(`select id from "user" where email = $1`, [BEN.
 await adminCtx.request.post(`${base}/api/admin/users/${benId}/invite`, {
   data: {sendEmail: true},
 });
+const invitedProbe = await pool2.query(
+  `select id from "user" where email like 'invited-%@test.local' and first_login_at is null order by email limit 1`,
+);
+const invitedId = invitedProbe.rows[0]?.id;
+if (invitedId) {
+  await adminCtx.request.post(`${base}/api/admin/users/${invitedId}/invite`, {
+    data: {sendEmail: false},
+  });
+}
 const pendingReq = await pool2.query(
   `select id from portal_requests where user_id = $1 and status = 'pending' order by created_at limit 1`,
   [benId],
