@@ -188,21 +188,7 @@ a:hover {
   box-sizing: border-box;
 }
 
-/* Stacked hero: full-width copy can fit four stats in one row */
-@media (max-width: 1099px) {
-  .hero-stats {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 16px 20px;
-    max-width: min(100%, 720px);
-  }
-}
-
-@media (max-width: 640px) {
-  .hero-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    max-width: 100%;
-  }
-}
+/* Hero stats stay 2×2 whenever copy sits above/below media (<1100px) or beside it (≥1100px). */
 
 .hero-stat {
   min-width: 0;
