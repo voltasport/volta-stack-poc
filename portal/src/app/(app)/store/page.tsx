@@ -1,6 +1,8 @@
 import {Shell} from "@/components/shell";
+import {EmptyPage} from "@/components/portal-empty-states";
 import {StoreGrid} from "@/components/store-grid";
-import {allSchools, entities, productsForEntity} from "@/lib/entities";
+import {isPendingAccess} from "@/lib/access";
+import {allSchools, entities, pendingSchool, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
 import {loadPortalPage} from "@/lib/page-shell";
 import {schoolFilterForStore} from "@/lib/access";
@@ -9,6 +11,17 @@ export const dynamic = "force-dynamic";
 
 export default async function StorePage() {
   const {access, entity, shellConfig} = await loadPortalPage();
+
+  if (isPendingAccess(access) || entity.slug === pendingSchool.slug) {
+    return (
+      <Shell config={shellConfig}>
+        <EmptyPage title="Team store">
+          <p>Your team store hasn&apos;t been set up yet. Your Volta rep will connect products when your program is ready.</p>
+        </EmptyPage>
+      </Shell>
+    );
+  }
+
   schoolFilterForStore(access, entity.slug);
   const {domain, products} = await fetchShopifyProducts();
   const mine = productsForEntity(products, entity.slug);
@@ -26,13 +39,15 @@ export default async function StorePage() {
   return (
     <Shell config={shellConfig}>
       {mine.length === 0 ? (
-        <div>
-          <p className="text-sm text-[#6d7b8a]">{entity.name}</p>
-          <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">TEAM STORE</h1>
-          <p className="mt-4 max-w-xl text-sm leading-6 text-[#3c4a5c]">
-            Nothing in the Shopify catalog is filed under {entity.name} for your account.
-          </p>
-        </div>
+        <EmptyPage eyebrow={entity.slug === allSchools.slug ? "All schools" : entity.name} title="Team store">
+          {entity.slug === allSchools.slug ? (
+            <p>No team gear is in the catalog yet. Products will appear here once they are published in Shopify.</p>
+          ) : (
+            <p>
+              No team gear has been set up for {entity.name} yet. Your Volta rep can publish products when your store is ready.
+            </p>
+          )}
+        </EmptyPage>
       ) : (
         <StoreGrid
           domain={domain}

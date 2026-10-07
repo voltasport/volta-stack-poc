@@ -2,6 +2,7 @@
 
 import {useParams, useRouter, useSearchParams} from "next/navigation";
 import {useState} from "react";
+import {signIn} from "@/lib/auth-client";
 
 export default function ResetPasswordPage() {
   const params = useParams<{token: string}>();
@@ -10,6 +11,7 @@ export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const email = search.get("email")?.trim() ?? "";
 
   return (
     <main className="grid min-h-screen place-items-center bg-[#f3f0e8] px-6 text-[#122033]">
@@ -33,7 +35,20 @@ export default function ResetPasswordPage() {
               setError(payload?.message ?? "Could not reset password");
               return;
             }
-            router.push(search.get("callbackURL") || "/");
+            const destination = search.get("callbackURL") || "/";
+            if (email) {
+              const signInResult = await signIn.email({email, password});
+              if (!signInResult.error) {
+                router.push(destination);
+                router.refresh();
+                return;
+              }
+            }
+            const loginParams = new URLSearchParams();
+            if (email) loginParams.set("email", email);
+            loginParams.set("passwordSet", "1");
+            loginParams.set("next", destination);
+            router.push(`/login?${loginParams.toString()}`);
             router.refresh();
           }}
         >

@@ -4,7 +4,7 @@ import Link from "next/link";
 import {usePathname, useRouter} from "next/navigation";
 import {useCallback, useEffect, useState} from "react";
 import {signOut} from "@/lib/auth-client";
-import {allSchools, entityBySlug} from "@/lib/entities";
+import {allSchools, entityBySlug, pendingSchool} from "@/lib/entities";
 import {navItemActive, type NavItem} from "@/lib/shell-nav";
 import type {ShellConfig, ShellEntity} from "@/lib/shell-config";
 
@@ -40,7 +40,27 @@ function EntitySwitcher({
   onChange: (slug: string) => void;
 }) {
   const router = useRouter();
-  const entity = choices.find((item) => item.slug === slug) ?? choices[0];
+
+  if (choices.length === 0) {
+    return (
+      <div
+        className={`mx-3 mt-4 flex items-center gap-2 rounded-xl bg-[#163024] px-3 py-2 opacity-90 ${
+          collapsed ? "justify-center px-2" : ""
+        }`}
+        title={pendingSchool.name}
+        aria-label="School"
+      >
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-[#2a4034] text-[11px] font-bold text-[#8aa99a]">
+          {pendingSchool.short}
+        </span>
+        {!collapsed ? (
+          <span className="text-sm font-semibold text-[#9eb0c2]">{pendingSchool.name}</span>
+        ) : null}
+      </div>
+    );
+  }
+
+  const entity = choices.find((item) => item.slug === slug) ?? choices[0]!;
 
   return (
     <label
@@ -111,12 +131,15 @@ function SidebarPanel({
       setSlug(fromCookie);
       return;
     }
-    setSlug(config.defaultEntitySlug);
-    document.cookie = `volta_entity=${encodeURIComponent(config.defaultEntitySlug)}; path=/; max-age=31536000; samesite=lax`;
+    const next = config.defaultEntitySlug;
+    setSlug(next);
+    document.cookie = `volta_entity=${encodeURIComponent(next)}; path=/; max-age=31536000; samesite=lax`;
   }, [config.defaultEntitySlug, config.entityChoices]);
 
   const entity = entityBySlug(slug);
-  const showCounts = entity.slug !== allSchools.slug || config.entityChoices.includes(allSchools);
+  const showCounts =
+    entity.slug !== allSchools.slug ||
+    config.entityChoices.some((item) => item.slug === allSchools.slug);
 
   return (
     <>
@@ -331,12 +354,6 @@ export function AdminActions({show}: {show: boolean}) {
         className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
       >
         Share status link
-      </button>
-      <button
-        type="button"
-        className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
-      >
-        + New program
       </button>
     </div>
   );

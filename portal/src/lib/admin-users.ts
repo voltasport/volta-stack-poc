@@ -36,7 +36,7 @@ export async function createPortalUser(input: {
     result.user.id,
     input.role,
   ]);
-  return {user: {...result.user, role: input.role}, tempPassword: input.password ? undefined : tempPassword};
+  return {user: {...result.user, role: input.role}};
 }
 
 export async function generatePasswordResetLink(email: string) {
@@ -58,5 +58,9 @@ export async function generatePasswordResetLink(email: string) {
     throw new Error("Could not create reset link. Check that the user exists.");
   }
   const token = identifier.replace("reset-password:", "");
-  return `${baseUrl()}/reset-password/${token}?callbackURL=${encodeURIComponent("/")}`;
+  const params = new URLSearchParams({
+    callbackURL: "/",
+    email,
+  });
+  return `${baseUrl()}/reset-password/${token}?${params.toString()}`;
 }
