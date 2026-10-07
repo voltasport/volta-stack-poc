@@ -9,8 +9,8 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "Volta director portal",
-  description: "Next.js proof of concept for the Volta athletics portal",
+  title: "Volta portal",
+  description: "Programs, proofs, rosters, and team stores for athletics directors.",
 };
 
 export default function RootLayout({children}: {children: ReactNode}) {

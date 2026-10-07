@@ -26,17 +26,8 @@ export function ProofApproval() {
   const ready = checks.every((item) => checked[item.id]) && name.trim().length > 1 && version === "v3";
 
   return (
-    <div className="min-h-screen bg-[#0c1b2e] text-white">
-      <div className="flex items-center justify-between border-b border-white/10 px-5 py-3 text-xs text-[#c5d2df]">
-        <p>
-          <span className="font-semibold text-white">Next.js + Vercel.</span> This approval is app
-          state. Nothing is written to Shopify.
-        </p>
-        <a href="https://volta-storefront.vercel.app/portal/approvals/away-kit" className="font-semibold text-[#8ee8b4]">
-          Open the Hydrogen proof
-        </a>
-      </div>
-      <header className="flex items-center justify-between px-5 py-4">
+    <div className="-mx-4 min-h-[calc(100svh-3.5rem)] bg-[#0c1b2e] text-white sm:-mx-6">
+      <header className="flex flex-col gap-4 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div className="flex items-center gap-3">
           <Link
             href="/programs/womens-soccer?tab=proofs"
@@ -49,7 +40,7 @@ export function ProofApproval() {
             <h1 className="text-2xl font-black tracking-tight">AWAY KIT · V3</h1>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setFace("Front")}
@@ -67,8 +58,8 @@ export function ProofApproval() {
         </div>
       </header>
 
-      <div className="grid min-h-[calc(100vh-118px)] grid-cols-[minmax(0,1fr)_380px]">
-        <div className="relative m-4 overflow-hidden rounded-3xl border border-white/10 bg-[repeating-linear-gradient(135deg,#13283f_0px,#13283f_12px,#102338_12px,#102338_24px)]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px]">
+        <div className="relative m-3 min-h-[280px] overflow-hidden rounded-3xl border border-white/10 bg-[repeating-linear-gradient(135deg,#13283f_0px,#13283f_12px,#102338_12px,#102338_24px)] sm:m-4 lg:min-h-[420px]">
           <span className="absolute left-[28%] top-[22%] grid h-8 w-8 place-items-center rounded-full bg-[#3dcb7a] text-sm font-bold text-[#0c1726]">
             1
           </span>
@@ -79,7 +70,7 @@ export function ProofApproval() {
             [PROOF ARTWORK — {face.toUpperCase()}]
             {version !== "v3" ? ` · viewing ${version}` : ""}
           </p>
-          <div className="absolute bottom-4 left-4 flex gap-2">
+          <div className="absolute bottom-4 left-4 flex max-w-[calc(100%-2rem)] flex-wrap gap-2">
             {versions.map((item) => (
               <button
                 key={item.id}
@@ -101,7 +92,7 @@ export function ProofApproval() {
           </div>
         </div>
 
-        <aside className="bg-[#f4f1ea] px-5 py-6 text-[#122033]">
+        <aside className="bg-[#f4f1ea] px-4 py-6 text-[#122033] sm:px-5">
           <h2 className="text-sm font-extrabold tracking-[0.08em]">WHAT CHANGED</h2>
           <ol className="mt-3 flex flex-col gap-2">
             <Change n="1" text={'Sleeve stripe moved up 1" per Marli’s note.'} />

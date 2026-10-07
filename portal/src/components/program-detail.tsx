@@ -29,9 +29,9 @@ export function ProgramDetail({
         ← All programs
       </Link>
       <p className="mt-3 text-sm text-[#6d7b8a]">{program.eyebrow}</p>
-      <div className="mt-1 flex items-start justify-between gap-4">
-        <h1 className="text-5xl font-black tracking-[-0.045em]">{program.title}</h1>
-        <div className="flex gap-2 pt-2">
+      <div className="mt-1 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="text-3xl font-black tracking-[-0.045em] sm:text-5xl">{program.title}</h1>
+        <div className="flex flex-wrap gap-2 sm:pt-2">
           <Link
             href="/store"
             className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
@@ -39,7 +39,7 @@ export function ProgramDetail({
             Share status link
           </Link>
           <a
-            href="https://volta-storefront.vercel.app/portal"
+            href="mailto:hello@voltasport.co"
             className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
           >
             Message Volta
@@ -48,7 +48,7 @@ export function ProgramDetail({
       </div>
 
       <section className="mt-5 rounded-3xl bg-[#0e1c30] px-6 py-5 text-white">
-        <div className="flex items-start justify-between gap-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
           <p className="text-2xl font-black tracking-tight">
             <span className="mr-2 text-[#3ee58a]">●</span>
             {program.phase}
@@ -61,7 +61,7 @@ export function ProgramDetail({
         <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#24384c]">
           <div className="h-full rounded-full bg-[#3cba6f]" style={{width: `${Math.max(progress, 8)}%`}} />
         </div>
-        <ol className="mt-3 grid grid-cols-6 gap-2 text-xs">
+        <ol className="mt-3 grid grid-cols-2 gap-2 text-xs sm:grid-cols-3 lg:grid-cols-6">
           {program.milestones.map((milestone) => (
             <li key={milestone.label}>
               <p className={milestone.state === "next" ? "text-[#8aa0b5]" : "font-semibold text-[#d7f5e4]"}>
@@ -73,7 +73,7 @@ export function ProgramDetail({
         </ol>
       </section>
 
-      <div className="mt-4 flex w-fit gap-1 rounded-full bg-white p-1">
+      <div className="mt-4 flex max-w-full gap-1 overflow-x-auto rounded-full bg-white p-1">
         {tabs.map((item) => (
           <button
             key={item.id}
@@ -88,8 +88,8 @@ export function ProgramDetail({
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-[minmax(0,1.6fr)_280px] gap-4">
-        <section className="rounded-3xl bg-white p-5">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_280px]">
+        <section className="min-w-0 rounded-3xl bg-white p-5">
           {tab === "items" ? <Items program={program} /> : null}
           {tab === "roster" ? <Roster program={program} /> : null}
           {tab === "proofs" ? <Proofs program={program} /> : null}
@@ -120,7 +120,8 @@ function Items({program}: {program: Program}) {
   return (
     <div>
       <h2 className="text-sm font-extrabold tracking-[0.08em]">ITEMS</h2>
-      <table className="mt-3 w-full text-left text-sm">
+      <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
+      <table className="w-full min-w-[520px] text-left text-sm">
         <thead className="text-xs text-[#7b8794]">
           <tr>
             <th className="pb-2 font-medium">Item</th>
@@ -147,6 +148,7 @@ function Items({program}: {program: Program}) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
@@ -162,7 +164,8 @@ function Roster({program}: {program: Program}) {
       <p className="mt-2 text-sm text-[#6d7b8a]">
         Players fill these in from the sizing link. {missing} still missing.
       </p>
-      <table className="mt-3 w-full text-left text-sm">
+      <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
+      <table className="w-full min-w-[640px] text-left text-sm">
         <thead className="text-xs text-[#7b8794]">
           <tr>
             <th className="pb-2 font-medium">#</th>
@@ -196,6 +199,7 @@ function Roster({program}: {program: Program}) {
           ))}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import {readFileSync} from "node:fs";
 import {neon} from "@neondatabase/serverless";
+import {Pool} from "pg";
 import {needsYou, programs, updates} from "../src/lib/data";
 
 function databaseUrl() {
@@ -11,7 +12,19 @@ function databaseUrl() {
   return line.slice("DATABASE_URL=".length).trim();
 }
 
-const sql = neon(databaseUrl());
+function createSql() {
+  const url = databaseUrl();
+  if (/localhost|127\.0\.0\.1/.test(url)) {
+    const pool = new Pool({connectionString: url});
+    return {
+      query: (text: string, params?: unknown[]) =>
+        pool.query(text, params).then((result: {rows: unknown[]}) => result.rows),
+    };
+  }
+  return neon(url);
+}
+
+const sql = createSql();
 
 async function main() {
 

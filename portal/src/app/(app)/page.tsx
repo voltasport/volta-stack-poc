@@ -35,14 +35,14 @@ export default async function OverviewPage() {
     : [];
   return (
     <Shell>
-      <div className="flex items-start justify-between gap-6">
-        <div>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+        <div className="min-w-0">
           <p className="text-sm text-[#6d7b8a]">Saturday, Oct 3</p>
-          <h1 className="mt-1 text-5xl font-black tracking-[-0.045em] text-[#101828]">
+          <h1 className="mt-1 text-3xl font-black tracking-[-0.045em] text-[#101828] sm:text-5xl">
             MORNING, BARBIE.
           </h1>
         </div>
-        <div className="flex gap-2 pt-3">
+        <div className="flex flex-wrap gap-2 sm:pt-3">
           <Link
             href="/programs/cross-country"
             className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
@@ -59,7 +59,7 @@ export default async function OverviewPage() {
       </div>
 
       {schools.length > 0 ? (
-        <ul className="mt-6 grid grid-cols-3 gap-3">
+        <ul className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {schools
             .filter((school) => school.slug !== "other" || school.count > 0)
             .map((school) => (
@@ -78,7 +78,7 @@ export default async function OverviewPage() {
         </ul>
       ) : null}
 
-      <div className="mt-6 grid grid-cols-4 gap-3">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Stat label="Active programs" value="4" />
         <Stat label="In production" value="2" />
         <Stat label="Next delivery" value="OCT 17" />
@@ -88,7 +88,7 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-[minmax(0,1.7fr)_minmax(280px,0.9fr)] gap-4">
+      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.9fr)]">
         <section className="rounded-3xl bg-white p-5 shadow-[0_1px_0_rgba(16,24,40,0.04)]">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-extrabold tracking-[0.08em]">PROGRAMS</h2>
@@ -101,7 +101,7 @@ export default async function OverviewPage() {
               <li key={program.slug} className="border-t border-[#f0ece4] first:border-t-0">
                 <Link
                   href={`/programs/${program.slug}`}
-                  className="grid grid-cols-[1.2fr_1.1fr_auto_auto] items-center gap-3 py-3"
+                  className="grid grid-cols-1 items-start gap-2 py-3 sm:grid-cols-[1.2fr_1.1fr_auto_auto] sm:items-center sm:gap-3"
                 >
                   <span>
                     <span className="block text-sm font-semibold">{program.name}</span>
