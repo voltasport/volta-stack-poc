@@ -1,6 +1,7 @@
 import type {AccessContext} from "@/lib/access";
 import {buildNav} from "@/lib/shell-nav";
 import {allSchools, type CatalogEntity} from "@/lib/entities";
+import type {ShellMetrics} from "@/lib/shell-metrics";
 
 /** Serializable subset for the client Shell (no RegExp). */
 export type ShellEntity = Pick<CatalogEntity, "slug" | "name" | "short" | "programs">;
@@ -24,27 +25,19 @@ function toShellEntity(entity: CatalogEntity): ShellEntity {
 export function createShellConfig(
   access: AccessContext,
   entity: CatalogEntity,
-  programCount: number,
-  needsYouCount: number,
-  rosterProgramSlug?: string,
+  metrics: ShellMetrics,
 ): ShellConfig {
-  const rosterHref = rosterProgramSlug
-    ? `/programs/${rosterProgramSlug}?tab=roster`
-    : "/programs";
-  const nav = buildNav(access, programCount, needsYouCount).map((item) =>
-    item.match === "roster" ? {...item, href: rosterHref} : item,
-  );
+  const nav = buildNav(access, metrics.programCount, metrics.approvalCount);
 
   const entityChoices: ShellEntity[] = [];
   const seen = new Set<string>();
-  const push = (entity: CatalogEntity) => {
-    if (seen.has(entity.slug)) return;
-    seen.add(entity.slug);
-    entityChoices.push(toShellEntity(entity));
+  const push = (entry: CatalogEntity) => {
+    if (seen.has(entry.slug)) return;
+    seen.add(entry.slug);
+    entityChoices.push(toShellEntity(entry));
   };
   if (access.canSeeAllSchools) push(allSchools);
-  for (const entity of access.entities) push(entity);
-
+  for (const entry of access.entities) push(entry);
 
   return {
     nav,

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import {usePathname, useRouter, useSearchParams} from "next/navigation";
-import {Suspense, useCallback, useEffect, useState} from "react";
+import {usePathname, useRouter} from "next/navigation";
+import {useCallback, useEffect, useState} from "react";
 import {signOut} from "@/lib/auth-client";
 import {allSchools, entityBySlug} from "@/lib/entities";
 import {navItemActive, type NavItem} from "@/lib/shell-nav";
@@ -11,6 +11,22 @@ import type {ShellConfig, ShellEntity} from "@/lib/shell-config";
 const SIDEBAR_STORAGE_KEY = "volta-sidebar-collapsed";
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED_WIDTH = 72;
+
+function NavIcon({icon}: {icon: string}) {
+  if (icon === "store") {
+    return (
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        className="h-[18px] w-[18px] fill-none stroke-current stroke-[1.75]"
+      >
+        <path d="M4 10h16M6 10V8a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v2M5 10l1 10h12l1-10" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M9 14h6" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  return <span aria-hidden="true">{icon}</span>;
+}
 
 function EntitySwitcher({
   slug,
@@ -72,9 +88,20 @@ function SidebarPanel({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const search = useSearchParams();
-  const tab = search.get("tab");
+  const [tab, setTab] = useState<string | null>(null);
   const [slug, setSlug] = useState(config.defaultEntitySlug);
+
+  useEffect(() => {
+    const readTab = () => new URLSearchParams(window.location.search).get("tab");
+    setTab(readTab());
+    const onUrlChange = () => setTab(readTab());
+    window.addEventListener("popstate", onUrlChange);
+    window.addEventListener("volta-url-updated", onUrlChange);
+    return () => {
+      window.removeEventListener("popstate", onUrlChange);
+      window.removeEventListener("volta-url-updated", onUrlChange);
+    };
+  }, [pathname]);
 
   useEffect(() => {
     const row = document.cookie.split("; ").find((entry) => entry.startsWith("volta_entity="));
@@ -142,8 +169,8 @@ function SidebarPanel({
               }`}
             >
               <span className={`flex items-center gap-2 ${collapsed ? "" : "min-w-0"}`}>
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/5 text-base leading-none">
-                  {item.icon}
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/5 font-[system-ui,sans-serif] text-base leading-none">
+                  <NavIcon icon={item.icon} />
                 </span>
                 {!collapsed ? <span className="truncate">{item.label}</span> : null}
               </span>
@@ -211,14 +238,12 @@ function Sidebar({
           mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <Suspense fallback={<div className="flex-1 bg-[#0c1726]" />}>
-          <SidebarPanel
-            config={config}
-            collapsed={collapsed}
-            onToggleCollapsed={onToggleCollapsed}
-            onNavigate={onCloseMobile}
-          />
-        </Suspense>
+        <SidebarPanel
+          config={config}
+          collapsed={collapsed}
+          onToggleCollapsed={onToggleCollapsed}
+          onNavigate={onCloseMobile}
+        />
       </aside>
     </>
   );

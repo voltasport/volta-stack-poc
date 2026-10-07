@@ -9,8 +9,16 @@ export type NavItem = {
   match: "exact" | "programs" | "roster" | "prefix" | "invoices" | "artwork" | "users" | "none";
 };
 
-export function buildNav(access: AccessContext, programCount: number, needsYouCount: number): NavItem[] {
-  const programCountLabel = programCount > 0 ? String(programCount) : undefined;
+function countLabel(value: number) {
+  return value > 0 ? String(value) : undefined;
+}
+
+export function buildNav(
+  access: AccessContext,
+  programCount: number,
+  approvalCount: number,
+): NavItem[] {
+  const programCountLabel = countLabel(programCount);
   const items: NavItem[] = [
     {href: "/", label: "Overview", icon: "◉", match: "exact"},
     {
@@ -23,12 +31,13 @@ export function buildNav(access: AccessContext, programCount: number, needsYouCo
   ];
 
   if (access.showApprovals) {
+    const approvalLabel = countLabel(approvalCount);
     items.push({
       href: "/approvals/away-kit",
       label: "Approvals",
       icon: "✓",
-      count: needsYouCount > 0 ? String(needsYouCount) : "1",
-      alert: true,
+      count: approvalLabel,
+      alert: approvalCount > 0,
       match: "prefix",
     });
   }
@@ -41,7 +50,7 @@ export function buildNav(access: AccessContext, programCount: number, needsYouCo
     match: "roster",
   });
 
-  items.push({href: "/store", label: "Team stores", icon: "▣", match: "prefix"});
+  items.push({href: "/store", label: "Team stores", icon: "store", match: "prefix"});
   items.push({href: "/invoices", label: "Invoices", icon: "⎘", match: "invoices"});
 
   if (access.showArtworkLocker) {

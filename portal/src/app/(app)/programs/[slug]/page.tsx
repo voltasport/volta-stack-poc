@@ -3,7 +3,8 @@ import {ProgramDetail} from "@/components/program-detail";
 import {Shell} from "@/components/shell";
 import {assertProgramAccess, requireAccess, resolveCurrentEntity} from "@/lib/access";
 import {createShellConfig} from "@/lib/shell-config";
-import {getProgram, getProgramSlugs, getPrograms, getTasks} from "@/lib/queries";
+import {getShellMetrics} from "@/lib/shell-metrics";
+import {getProgram} from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -22,10 +23,8 @@ export default async function ProgramPage({
   if (!program) notFound();
 
   const entity = await resolveCurrentEntity(access);
-  const programs = await getPrograms(access, entity.slug === "all" ? undefined : entity.slug);
-  const tasks = await getTasks(access);
-  const rosterSlug = programs[0]?.slug ?? slug;
-  const shellConfig = createShellConfig(access, entity, programs.length, tasks.length, rosterSlug);
+  const metrics = await getShellMetrics(access, entity);
+  const shellConfig = createShellConfig(access, entity, metrics);
 
   return (
     <Shell config={shellConfig}>

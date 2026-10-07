@@ -2,10 +2,8 @@ import {UsersAdmin} from "@/components/users-admin";
 import {Shell} from "@/components/shell";
 import {requireAdmin, resolveCurrentEntity} from "@/lib/access";
 import {createShellConfig} from "@/lib/shell-config";
+import {getShellMetrics} from "@/lib/shell-metrics";
 import {
-  getProgramSlugs,
-  getPrograms,
-  getTasks,
   getUserAssignments,
   listPortalUsers,
   listProgramsForAdmin,
@@ -16,10 +14,8 @@ export const dynamic = "force-dynamic";
 export default async function UsersPage() {
   const access = await requireAdmin();
   const entity = await resolveCurrentEntity(access);
-  const programs = await getPrograms(access);
-  const tasks = await getTasks(access);
-  const rosterSlug = programs[0]?.slug ?? (await getProgramSlugs(access))[0];
-  const shellConfig = createShellConfig(access, entity, programs.length, tasks.length, rosterSlug);
+  const metrics = await getShellMetrics(access, entity);
+  const shellConfig = createShellConfig(access, entity, metrics);
   const [users, allPrograms] = await Promise.all([listPortalUsers(), listProgramsForAdmin()]);
   const assignments = Object.fromEntries(
     await Promise.all(

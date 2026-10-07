@@ -24,13 +24,13 @@ const QUERY = `
   }
 `;
 
+import {getStorefrontCredentials} from "@/lib/shopify-storefront";
+
 export async function fetchShopifyProducts(): Promise<{
   domain: string;
   products: ShopifyProduct[];
 }> {
-  const domain = process.env.SHOPIFY_STORE_DOMAIN ?? "mock.shop";
-  const token =
-    process.env.SHOPIFY_STOREFRONT_TOKEN ?? "3b580e70970c4528da70c98e097c2fa0";
+  const {domain, token} = getStorefrontCredentials();
 
   const response = await fetch(`https://${domain}/api/2025-07/graphql.json`, {
     method: "POST",
