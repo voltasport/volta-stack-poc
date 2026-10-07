@@ -82,6 +82,7 @@ shots.push(await shot(benPage, "phase2-ben-checklist-mobile", true));
 
 await benCtx.request.post(`${base}/api/programs`, {
   data: {
+    organizationName: "And Collar",
     name: "And Collar Academy Soccer",
     sport: "Soccer",
     levelOrSeason: "Varsity · Fall 2026",
@@ -107,7 +108,14 @@ await pool2.end();
 
 if (benSlug) {
   await benPage.goto(`${base}/programs/${benSlug}?tab=roster`, {waitUntil: "networkidle"});
-  shots.push(await shot(benPage, "phase2-ben-roster-editor"));
+  shots.push(await shot(benPage, "phase2-ben-roster-editor", false));
+  await benPage.setViewportSize({width: 1024, height: 768});
+  shots.push(await shot(benPage, "phase2-ben-roster-1024", false));
+  await benPage.setViewportSize({width: 1280, height: 800});
+  shots.push(await shot(benPage, "phase2-ben-roster-1280", false));
+  await benPage.goto(`${base}/`, {waitUntil: "networkidle"});
+  shots.push(await shot(benPage, "phase2-ben-picker-after-program", false));
+  shots.push(await shot(benPage, "phase2-ben-picker-mobile", true));
 }
 
 const previewDir = join(process.cwd(), ".data", "email-previews");

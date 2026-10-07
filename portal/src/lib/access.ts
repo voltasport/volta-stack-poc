@@ -7,8 +7,12 @@ import {
   sidebarSchoolEntities,
   type CatalogEntity,
 } from "@/lib/entities";
+import {
+  loadOrganizationEntities,
+  organizationNameFromEmail,
+} from "@/lib/portal-organizations";
 import {sql} from "@/lib/db";
-import {isMissingTable} from "@/lib/db-errors";
+import {isMissingColumn, isMissingTable} from "@/lib/db-errors";
 import {type PortalRole} from "@/lib/roles";
 import {loadOnboardingDismissed, touchFirstLogin} from "@/lib/portal-invites";
 import {currentSession, resolvePortalRole} from "@/lib/session";
@@ -31,6 +35,7 @@ export type AccessContext = {
   showOnboardingChecklist: boolean;
   /** True when assignment table is missing — login works; run db:migrate for scoping. */
   preMigrationMode: boolean;
+  defaultOrganizationName: string;
 };
 
 async function loadProgramSlugs(userId: string): Promise<{slugs: string[]; preMigration: boolean}> {
@@ -55,6 +60,32 @@ async function loadSchoolSlugsForPrograms(programSlugs: string[]): Promise<strin
     [programSlugs],
   )) as {school_slug: string}[];
   return rows.map((row) => row.school_slug);
+}
+
+async function loadUserOrganizationSlug(userId: string): Promise<string | null> {
+  try {
+    const rows = (await sql().query(`select organization_slug from "user" where id = $1`, [
+      userId,
+    ])) as {organization_slug: string | null}[];
+    return rows[0]?.organization_slug ?? null;
+  } catch (error) {
+    if (isMissingColumn(error, "organization_slug") || isMissingTable(error, "portal_organizations")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function mergeEntitiesForSchoolSlugs(schoolSlugs: string[]): Promise<CatalogEntity[]> {
+  const uniqueSlugs = [...new Set(schoolSlugs)];
+  const staticMatches = sidebarSchoolEntities().filter((entity) =>
+    uniqueSlugs.includes(entity.slug),
+  );
+  const seen = new Set(staticMatches.map((entity) => entity.slug));
+  const dynamic = await loadOrganizationEntities(
+    uniqueSlugs.filter((slug) => !seen.has(slug)),
+  );
+  return [...staticMatches, ...dynamic];
 }
 
 export async function getAccessContext(): Promise<AccessContext | null> {
@@ -85,14 +116,19 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showCreateProgram: true,
       showOnboardingChecklist: false,
       preMigrationMode: false,
+      defaultOrganizationName: organizationNameFromEmail(email),
     };
   }
 
   const {slugs: programSlugs, preMigration} = await loadProgramSlugs(userId);
-  const schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
-  const allowedEntities = sidebarSchoolEntities().filter((entity) =>
-    schoolSlugs.includes(entity.slug),
-  );
+  let schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
+  const userOrgSlug = await loadUserOrganizationSlug(userId);
+  if (userOrgSlug && !schoolSlugs.includes(userOrgSlug)) {
+    schoolSlugs = [...schoolSlugs, userOrgSlug];
+  }
+  const allowedEntities = preMigration
+    ? sidebarSchoolEntities()
+    : await mergeEntitiesForSchoolSlugs(schoolSlugs);
 
   const isDirectorOrManager = role === "director" || role === "manager";
   let showOnboardingChecklist = isDirectorOrManager && !onboardingDismissed;
@@ -122,7 +158,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     name,
     programSlugs: preMigration ? null : programSlugs,
     schoolSlugs: preMigration ? null : schoolSlugs,
-    entities: preMigration ? sidebarSchoolEntities() : allowedEntities,
+    entities: allowedEntities,
     canSeeAllSchools: false,
     showAdminActions: false,
     showApprovals: false,
@@ -131,6 +167,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     showCreateProgram: isDirectorOrManager,
     showOnboardingChecklist,
     preMigrationMode: preMigration,
+    defaultOrganizationName: organizationNameFromEmail(email),
   };
 }
 
@@ -186,7 +223,7 @@ export async function resolveCurrentEntity(access: AccessContext): Promise<Catal
   }
 
   if (slug && access.entities.some((entity) => entity.slug === slug)) {
-    return entityBySlug(slug);
+    return access.entities.find((entity) => entity.slug === slug)!;
   }
 
   if (access.canSeeAllSchools) return allSchools;

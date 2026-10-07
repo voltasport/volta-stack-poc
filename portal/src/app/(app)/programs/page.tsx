@@ -41,7 +41,11 @@ export default async function ProgramsPage({
           </p>
           {shellConfig.showCreateProgram ? (
             <div className="mt-4">
-              <AdminActions show={false} showCreateProgram />
+              <AdminActions
+                show={false}
+                showCreateProgram
+                defaultOrganizationName={shellConfig.defaultOrganizationName}
+              />
             </div>
           ) : null}
         </EmptyPage>
@@ -59,6 +63,7 @@ export default async function ProgramsPage({
         <AdminActions
           show={shellConfig.showAdminActions}
           showCreateProgram={shellConfig.showCreateProgram}
+          defaultOrganizationName={shellConfig.defaultOrganizationName}
         />
       </div>
       {programs.length === 0 ? (

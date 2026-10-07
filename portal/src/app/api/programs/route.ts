@@ -1,5 +1,6 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
+import {organizationNameFromEmail} from "@/lib/portal-organizations";
 import {createProgramForUser} from "@/lib/portal-programs";
 
 export async function POST(request: Request) {
@@ -13,7 +14,7 @@ export async function POST(request: Request) {
       level?: string;
       season?: string;
       rosterSize?: number | string;
-      schoolSlug?: string;
+      organizationName?: string;
     };
     const levelOrSeason = String(body.levelOrSeason ?? body.level ?? body.season ?? "").trim();
     const rosterRaw = body.rosterSize;
@@ -22,12 +23,15 @@ export async function POST(request: Request) {
         ? null
         : Number.parseInt(String(rosterRaw), 10);
 
+    const orgName =
+      String(body.organizationName ?? "").trim() ||
+      organizationNameFromEmail(access.email);
     const result = await createProgramForUser(access, {
       name: String(body.name ?? ""),
       sport: String(body.sport ?? ""),
       levelOrSeason,
       rosterSize: Number.isFinite(rosterSize) ? rosterSize : null,
-      schoolSlug: body.schoolSlug,
+      organizationName: orgName,
     });
     if (!result.ok) {
       return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});

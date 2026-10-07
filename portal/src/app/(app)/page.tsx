@@ -35,6 +35,7 @@ export default async function OverviewPage() {
           hasRoster={hasRoster}
           programSlug={programSlug}
           inviteColumnsReady={inviteColumnsReady}
+          defaultOrganizationName={access.defaultOrganizationName}
         />
       </Shell>
     );
@@ -101,6 +102,7 @@ export default async function OverviewPage() {
         <AdminActions
           show={shellConfig.showAdminActions}
           showCreateProgram={shellConfig.showCreateProgram}
+          defaultOrganizationName={shellConfig.defaultOrganizationName}
         />
       </div>
 

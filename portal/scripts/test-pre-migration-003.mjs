@@ -3,6 +3,7 @@ import {execSync} from "node:child_process";
 import {readFileSync, writeFileSync} from "node:fs";
 import {Pool} from "pg";
 import {LOCAL_TEST_ADMIN_EMAIL, seedPasswords} from "./require-seed-env.mjs";
+import {onboardingE2eCredentials} from "./onboarding-e2e-helpers.mjs";
 
 for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
   const m = line.match(/^([^#=]+)=(.*)$/);
@@ -11,7 +12,8 @@ for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8
 
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
 const passwords = seedPasswords();
-const BEN = {email: "ben@andcollar.com", password: "BenOnboard-Audit-12"};
+const e2eCreds = onboardingE2eCredentials();
+const BEN = {email: e2eCreds.benEmail, password: e2eCreds.benPassword};
 
 async function login(ctx, email, password) {
   const res = await ctx.request.post(`${base}/api/auth/sign-in/email`, {data: {email, password}});

@@ -3,7 +3,13 @@
 import {useRouter} from "next/navigation";
 import {useState} from "react";
 
-export function NewProgramButton({className = ""}: {className?: string}) {
+export function NewProgramButton({
+  className = "",
+  defaultOrganizationName = "My organization",
+}: {
+  className?: string;
+  defaultOrganizationName?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
@@ -21,6 +27,7 @@ export function NewProgramButton({className = ""}: {className?: string}) {
         sport: data.get("sport"),
         levelOrSeason: data.get("levelOrSeason"),
         rosterSize: data.get("rosterSize"),
+        organizationName: data.get("organizationName"),
       }),
     });
     setPending(false);
@@ -57,6 +64,16 @@ export function NewProgramButton({className = ""}: {className?: string}) {
                 void submit(event.currentTarget);
               }}
             >
+              <label className="text-sm font-semibold">
+                Organization or school name
+                <input
+                  name="organizationName"
+                  required
+                  defaultValue={defaultOrganizationName}
+                  className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
+                  placeholder="And Collar"
+                />
+              </label>
               <label className="text-sm font-semibold">
                 Program name
                 <input

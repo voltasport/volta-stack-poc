@@ -312,13 +312,13 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
             <th className="pb-2 font-medium">Pos</th>
             <th className="pb-2 font-medium">Jersey</th>
             <th className="pb-2 font-medium">Short</th>
-            <th className="pb-2 font-medium">Name</th>
+            <th className="pb-2 font-medium">Back</th>
             <th className="pb-2 font-medium">Status</th>
           </tr>
         </thead>
         <tbody>
-          {program.roster.map((row) => (
-            <tr key={row.num} className="border-t border-[#f0ece4]">
+          {program.roster.map((row, index) => (
+            <tr key={row.id ?? `${row.num}-${index}`} className="border-t border-[#f0ece4]">
               <td className="py-2.5">{row.num}</td>
               <td>{row.name}</td>
               <td>{row.pos}</td>

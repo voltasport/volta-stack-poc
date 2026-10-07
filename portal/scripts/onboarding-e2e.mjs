@@ -1,5 +1,5 @@
 import {chromium} from "playwright";
-import {readFileSync, writeFileSync} from "node:fs";
+import {mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {Pool} from "pg";
 import {
   assertLocalDatabaseUrl,
@@ -17,7 +17,15 @@ for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8
 assertLocalDatabaseUrl();
 
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
+const out = "/opt/cursor/artifacts";
+mkdirSync(out, {recursive: true});
 const creds = onboardingE2eCredentials();
+
+async function capture(page, filename, width, height) {
+  await page.setViewportSize({width, height});
+  await page.screenshot({path: `${out}/${filename}`, fullPage: true});
+  return filename;
+}
 const report = {
   base,
   benEmail: creds.benEmail,
@@ -98,6 +106,12 @@ try {
   step("checklist", "Onboarding checklist visible");
 
   await benPage.getByRole("button", {name: "+ New program"}).click();
+  const orgField = benPage.locator('input[name="organizationName"]');
+  await orgField.waitFor({state: "visible"});
+  const orgValue = await orgField.inputValue();
+  if (!orgValue.trim()) {
+    await orgField.fill("And Collar");
+  }
   await benPage.fill('input[name="name"]', "E2E Academy Soccer");
   await benPage.fill('input[name="sport"]', "Soccer");
   await benPage.fill('input[name="levelOrSeason"]', "Varsity · Fall 2026");
@@ -106,6 +120,17 @@ try {
   await benPage.waitForURL(/\/programs\//, {timeout: 20000});
   const programUrl = benPage.url();
   step("create_program", `Program created (${programUrl})`);
+
+  await benPage.reload({waitUntil: "networkidle"});
+  const pickerText = await benPage.locator("body").innerText();
+  if (pickerText.includes("No school assigned yet")) {
+    step("school_picker", "Picker still shows pending after program create", false);
+  }
+  step("school_picker", "Organization visible in school picker after program create");
+  report.screenshots = report.screenshots ?? [];
+  report.screenshots.push(await capture(benPage, "e2e-picker-after-program-1024.png", 1024, 768));
+  report.screenshots.push(await capture(benPage, "e2e-picker-after-program-1280.png", 1280, 800));
+  report.screenshots.push(await capture(benPage, "e2e-picker-after-program-mobile.png", 390, 844));
 
   await benPage.goto(`${programUrl.split("?")[0]}?tab=roster`, {waitUntil: "networkidle"});
   await benPage.fill('input[placeholder="#"]', "10");
@@ -118,6 +143,8 @@ try {
     step("add_roster", "Roster row not visible after add", false);
   }
   step("add_roster", "Manual roster player saved");
+  report.screenshots.push(await capture(benPage, "e2e-roster-1024.png", 1024, 768));
+  report.screenshots.push(await capture(benPage, "e2e-roster-1280.png", 1280, 800));
 
   await purgeOnboardingUserByEmail(creds.benEmail);
   step("cleanup", "Purged Ben after successful flow");

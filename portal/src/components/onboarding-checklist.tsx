@@ -11,12 +11,14 @@ export function OnboardingChecklist({
   hasRoster,
   programSlug,
   inviteColumnsReady,
+  defaultOrganizationName,
 }: {
   firstName: string;
   hasProgram: boolean;
   hasRoster: boolean;
   programSlug: string | null;
   inviteColumnsReady: boolean;
+  defaultOrganizationName: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function OnboardingChecklist({
               </p>
               {!hasProgram ? (
                 <div className="mt-3">
-                  <NewProgramButton />
+                  <NewProgramButton defaultOrganizationName={defaultOrganizationName} />
                 </div>
               ) : (
                 <Link href="/programs" className="mt-3 inline-block text-sm font-semibold text-[#1f8a4d]">

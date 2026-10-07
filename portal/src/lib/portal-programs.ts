@@ -1,13 +1,20 @@
 import {randomBytes} from "node:crypto";
 import type {AccessContext} from "@/lib/access";
 import {sql} from "@/lib/db";
+import {
+  ensurePortalOrganization,
+  linkUserToOrganization,
+  organizationNameFromEmail,
+  rosterBackName,
+  slugifyOrganizationName,
+} from "@/lib/portal-organizations";
 
 export type CreateProgramInput = {
   name: string;
   sport: string;
   levelOrSeason: string;
   rosterSize?: number | null;
-  schoolSlug?: string;
+  organizationName: string;
 };
 
 function slugify(name: string) {
@@ -51,7 +58,20 @@ export async function createProgramForUser(access: AccessContext, input: CreateP
     return {ok: false as const, error: "Name, sport, and level or season are required."};
   }
 
-  const schoolSlug = (input.schoolSlug?.trim() || "other").slice(0, 48);
+  let schoolSlug: string;
+  const orgName =
+    input.organizationName.trim() || organizationNameFromEmail(access.email);
+  const org = await ensurePortalOrganization(orgName);
+  if (org.ok) {
+    schoolSlug = org.slug;
+    if (access.role !== "admin") {
+      await linkUserToOrganization(access.userId, org.slug);
+    }
+  } else if (org.error.includes("db:migrate")) {
+    schoolSlug = slugifyOrganizationName(orgName).slice(0, 48);
+  } else {
+    return {ok: false as const, error: org.error};
+  }
   let slug = slugify(name);
   const taken = (await sql().query(`select slug from programs where slug = $1`, [slug])) as {
     slug: string;
@@ -148,18 +168,31 @@ export function parseRosterImport(text: string): ParsedRosterLine[] {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
-  const header = lines[0].toLowerCase();
-  const hasHeader = header.includes("name") || header.includes("number") || header.includes("num");
-  const body = hasHeader ? lines.slice(1) : lines;
+  let numCol = 0;
+  let nameCol = 1;
+  let posCol = 2;
+  let body = lines;
+  const headerParts = lines[0].split(/[,;\t]/).map((c) => c.trim().toLowerCase());
+  const looksLikeHeader = headerParts.some((h) =>
+    /^(name|number|num|#|no|pos|position)$/.test(h),
+  );
+  if (looksLikeHeader) {
+    body = lines.slice(1);
+    headerParts.forEach((h, index) => {
+      if (h === "name" || h === "athlete") nameCol = index;
+      if (h === "number" || h === "num" || h === "#" || h === "no") numCol = index;
+      if (h === "pos" || h === "position") posCol = index;
+    });
+  }
 
   const out: ParsedRosterLine[] = [];
   for (const line of body) {
     const cols = line.split(/[,;\t]/).map((c) => c.trim());
     if (cols.length >= 2) {
       out.push({
-        num: cols[0] || String(out.length + 1),
-        name: cols[1] || "Athlete",
-        pos: cols[2] || "—",
+        num: cols[numCol] || String(out.length + 1),
+        name: cols[nameCol] || "Athlete",
+        pos: cols[posCol] || "—",
       });
     } else {
       const parts = line.split(/\s+/);
@@ -201,11 +234,12 @@ export async function importRosterLines(
   let sort = (existing[0]?.max ?? -1) + 1;
 
   for (const row of lines) {
+    const back = rosterBackName(row.name);
     await sql().query(
       `insert into roster_rows (
         program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-      ) values ($1, $2, $3, $4, '—', '—', $4, false, $5)`,
-      [programSlug, row.num, row.name, row.pos, sort++],
+      ) values ($1, $2, $3, $4, '—', '—', $5, false, $6)`,
+      [programSlug, row.num, row.name, row.pos, back, sort++],
     );
   }
 
@@ -227,10 +261,11 @@ export async function upsertRosterPlayer(
     return {ok: false as const, error: "Number and name are required."};
   }
 
+  const back = rosterBackName(name);
   if (input.rowId) {
     await sql().query(
-      `update roster_rows set num = $2, name = $3, pos = $4, back = $4 where id = $1 and program_slug = $5`,
-      [input.rowId, num, name, pos, programSlug],
+      `update roster_rows set num = $2, name = $3, pos = $4, back = $5 where id = $1 and program_slug = $6`,
+      [input.rowId, num, name, pos, back, programSlug],
     );
     return {ok: true as const};
   }
@@ -243,8 +278,8 @@ export async function upsertRosterPlayer(
   await sql().query(
     `insert into roster_rows (
       program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-    ) values ($1, $2, $3, $4, '—', '—', $4, false, $5)`,
-    [programSlug, num, name, pos, sort],
+    ) values ($1, $2, $3, $4, '—', '—', $5, false, $6)`,
+    [programSlug, num, name, pos, back, sort],
   );
   return {ok: true as const};
 }

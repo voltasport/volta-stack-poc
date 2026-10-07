@@ -238,28 +238,28 @@ function Sidebar({
   mobileOpen,
   onToggleCollapsed,
   onCloseMobile,
+  desktopWidth,
 }: {
   config: ShellConfig;
   collapsed: boolean;
   mobileOpen: boolean;
   onToggleCollapsed: () => void;
   onCloseMobile: () => void;
+  desktopWidth: number;
 }) {
-  const width = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
-
   return (
     <>
       <div
         aria-hidden={!mobileOpen}
-        className={`fixed inset-0 z-40 bg-[#0c1726]/60 backdrop-blur-[1px] transition-opacity lg:hidden ${
+        className={`fixed inset-0 z-40 bg-[#0c1726]/60 backdrop-blur-[1px] transition-opacity md:hidden ${
           mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
         onClick={onCloseMobile}
       />
       <aside
-        style={{width}}
-        className={`fixed inset-y-0 left-0 z-50 flex h-svh flex-col overflow-hidden bg-[#0c1726] text-white transition-[width,transform] duration-200 ease-out lg:translate-x-0 ${
-          mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full lg:translate-x-0"
+        style={{width: desktopWidth}}
+        className={`fixed inset-y-0 left-0 z-50 flex h-svh flex-col overflow-hidden bg-[#0c1726] text-white transition-[width,transform] duration-200 ease-out md:hidden ${
+          mobileOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         }`}
       >
         <SidebarPanel
@@ -267,6 +267,16 @@ function Sidebar({
           collapsed={collapsed}
           onToggleCollapsed={onToggleCollapsed}
           onNavigate={onCloseMobile}
+        />
+      </aside>
+      <aside
+        style={{width: desktopWidth}}
+        className="sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden bg-[#0c1726] text-white transition-[width] duration-200 ease-out md:flex"
+      >
+        <SidebarPanel
+          config={config}
+          collapsed={collapsed}
+          onToggleCollapsed={onToggleCollapsed}
         />
       </aside>
     </>
@@ -302,24 +312,20 @@ export function Shell({
 
   const sidebarWidth = collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH;
 
+  const desktopWidth = hydrated ? sidebarWidth : SIDEBAR_WIDTH;
+
   return (
-    <div className="min-h-svh bg-[#f3f0e8] text-[#122033]">
+    <div className="min-h-svh bg-[#f3f0e8] text-[#122033] md:flex md:items-stretch">
       <Sidebar
         config={config}
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onToggleCollapsed={toggleCollapsed}
         onCloseMobile={() => setMobileOpen(false)}
+        desktopWidth={desktopWidth}
       />
-      <div
-        className="flex min-h-svh min-w-0 flex-col transition-[padding] duration-200 ease-out lg:pl-[var(--sidebar-offset)]"
-        style={
-          {
-            "--sidebar-offset": hydrated ? `${sidebarWidth}px` : `${SIDEBAR_WIDTH}px`,
-          } as React.CSSProperties
-        }
-      >
-        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[#e4dfd4] bg-[#f7f4ee] px-4 py-2 text-xs text-[#5d6b7a] lg:hidden sm:px-6">
+      <div className="flex min-h-svh min-w-0 flex-1 flex-col">
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-[#e4dfd4] bg-[#f7f4ee] px-4 py-2 text-xs text-[#5d6b7a] md:hidden sm:px-6">
           <button
             type="button"
             aria-label="Open menu"
@@ -349,14 +355,18 @@ export function Shell({
 export function AdminActions({
   show,
   showCreateProgram = false,
+  defaultOrganizationName = "My organization",
 }: {
   show: boolean;
   showCreateProgram?: boolean;
+  defaultOrganizationName?: string;
 }) {
   if (!show && !showCreateProgram) return null;
   return (
     <div className="flex flex-wrap gap-2 sm:pt-3">
-      {showCreateProgram ? <NewProgramButton /> : null}
+      {showCreateProgram ? (
+        <NewProgramButton defaultOrganizationName={defaultOrganizationName} />
+      ) : null}
       {show ? (
         <button
           type="button"
