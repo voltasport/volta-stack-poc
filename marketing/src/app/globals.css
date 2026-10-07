@@ -580,13 +580,24 @@ a:hover {
 }
 
 .rv {
-  opacity: 0;
-  transform: translateY(28px);
   transition: opacity 0.65s cubic-bezier(0.2, 0.7, 0.2, 1), transform 0.65s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
+
+html.scroll-reveal-js .rv:not(.rv-in) {
+  opacity: 0;
+  transform: translateY(28px);
+}
+
 .rv-in {
   opacity: 1;
   transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.scroll-reveal-js .rv:not(.rv-in) {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .ui {
