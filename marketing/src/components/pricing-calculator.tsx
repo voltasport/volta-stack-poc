@@ -26,7 +26,7 @@ export function PricingCalculator() {
 
   return (
     <div
-      className="rv pricing-calc"
+      className="rv pricing-calc pricing-calc-panel"
       style={{
         background: "#16243A",
         color: "#F6F4F0",
@@ -70,7 +70,7 @@ export function PricingCalculator() {
       </div>
       <div style={{flex: "1 1 380px", minWidth: 0, background: "#101B2D", borderRadius: 24, padding: 32}}>
         <div style={{fontSize: 14, color: "#B8C2D3"}}>You&apos;d save about</div>
-        <div className="disp headline-section" style={{color: "#58B077", margin: "8px 0", lineHeight: 0.9}}>
+        <div className="disp headline-section pricing-savings-result" style={{color: "#58B077", margin: "8px 0"}}>
           ${savings.toLocaleString("en-US")}
         </div>
         <div style={{fontSize: 14, color: "#B8C2D3"}}>per year. Enough for:</div>

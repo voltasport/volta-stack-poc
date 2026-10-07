@@ -34,7 +34,7 @@ export default async function StoresPage() {
           {stores.map(({entity, products: gear}) => (
             <article key={entity.slug} className="store-card" style={{background: "#fff", borderRadius: 24, padding: 24}}>
               <span className="tag tag-live">{entity.programs ? "Program portal + store" : "Team store"}</span>
-              <h2 className="disp headline-section-sm" style={{color: "#101B2D", margin: "16px 0 8px"}}>
+              <h2 className="disp store-card-title" style={{color: "#101B2D", margin: "16px 0 8px"}}>
                 {entity.name}
               </h2>
               <p style={{color: "#4A5566", minHeight: 48, margin: 0}}>

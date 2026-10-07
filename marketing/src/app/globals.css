@@ -36,25 +36,21 @@ a:hover {
 .headline-hero {
   font-size: clamp(2.25rem, 11cqi + 0.5rem, 9.75rem);
   max-width: 100%;
-  overflow-wrap: break-word;
 }
 
 .headline-page {
   font-size: clamp(2.5rem, 8vw + 0.25rem, 7rem);
   max-width: 100%;
-  overflow-wrap: break-word;
 }
 
 .headline-section {
   font-size: clamp(2rem, 5.5vw + 0.25rem, 6.5rem);
   max-width: 100%;
-  overflow-wrap: break-word;
 }
 
 .headline-section-sm {
   font-size: clamp(1.75rem, 4.5vw + 0.2rem, 4.5rem);
   max-width: 100%;
-  overflow-wrap: break-word;
 }
 
 .marketing-header {
@@ -181,6 +177,39 @@ a:hover {
   padding-bottom: 72px;
 }
 
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 28px;
+  margin-top: 12px;
+  width: 100%;
+  max-width: 520px;
+}
+
+@media (min-width: 1100px) {
+  .hero-stats {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    max-width: none;
+  }
+}
+
+.hero-stat-value {
+  font-size: clamp(28px, 6vw, 52px);
+  color: #f6f4f0;
+  line-height: 0.92;
+}
+
+.hero-stat-accent {
+  color: #58b077;
+}
+
+.hero-stat-label {
+  font-size: 13px;
+  color: #b8c2d3;
+  margin-top: 6px;
+  line-height: 1.35;
+}
+
 .hero-media {
   position: relative;
   min-width: 0;
@@ -217,25 +246,120 @@ a:hover {
 
 .store-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
-  gap: 16px;
+  grid-template-columns: 1fr;
+  gap: 20px;
   min-width: 0;
+}
+
+@media (min-width: 640px) {
+  .store-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .store-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .store-card {
   min-width: 0;
-  overflow: hidden;
   box-sizing: border-box;
+  container-type: inline-size;
+  overflow: visible;
 }
 
-.store-card h2,
+.store-card-title {
+  /* Scale so EXCELLENCE (~10 chars) fits one line at min card width (~280px in 3-col) */
+  font-size: clamp(1.25rem, 6.2cqi + 0.2rem, 2.65rem);
+  line-height: 0.95;
+  hyphens: none;
+  overflow-wrap: normal;
+  word-break: normal;
+  white-space: normal;
+}
+
 .store-card p {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 
 .store-product-title {
-  overflow-wrap: anywhere;
-  word-break: break-word;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.pricing-hero-section {
+  overflow: visible;
+}
+
+.pricing-hero-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 340px);
+  gap: clamp(20px, 4vw, 40px);
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .pricing-hero-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+.pricing-hero-copy {
+  min-width: 0;
+}
+
+.pricing-savings-badge {
+  background: #58b077;
+  color: #0f1724;
+  border-radius: 32px;
+  padding: clamp(22px, 4vw, 36px);
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 340px;
+  justify-self: end;
+  container-type: inline-size;
+  overflow: visible;
+}
+
+@media (max-width: 900px) {
+  .pricing-savings-badge {
+    max-width: 100%;
+    justify-self: stretch;
+  }
+}
+
+.pricing-savings-value {
+  font-size: clamp(3.25rem, 18cqi + 1rem, 7.5rem);
+  line-height: 0.88;
+}
+
+.pc .disp.price-value {
+  font-size: clamp(2.25rem, 9vw, 4.5rem);
+  line-height: 0.9;
+}
+
+.pricing-calc-panel {
+  container-type: inline-size;
+}
+
+.pricing-calc-panel .headline-section {
+  font-size: clamp(2.5rem, 12cqi + 0.5rem, 7.5rem);
+}
+
+.pricing-calc-panel .pricing-savings-result {
+  font-size: clamp(2.75rem, 14cqi + 0.5rem, 7.5rem);
+  line-height: 0.9;
+}
+
+.case-study-headline {
+  font-size: clamp(2.25rem, 8vw + 0.35rem, 10rem);
+  line-height: 0.9;
+  max-width: 100%;
 }
 
 .page-hero-pad {
@@ -346,6 +470,9 @@ a:hover {
   text-transform: uppercase;
   line-height: 0.88;
   letter-spacing: -0.01em;
+  hyphens: none;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .eyebrow {
