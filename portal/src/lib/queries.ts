@@ -93,7 +93,7 @@ const programQuery = `
   ) items on true
   left join lateral (
     select json_agg(json_build_object(
-      'num', num, 'name', name, 'pos', pos, 'jersey', jersey,
+      'id', id, 'num', num, 'name', name, 'pos', pos, 'jersey', jersey,
       'short', short, 'back', back, 'submitted', submitted
     ) order by sort_order) as roster
     from roster_rows

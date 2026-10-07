@@ -14,7 +14,6 @@ export type NavItem = {
     | "invoices"
     | "artwork"
     | "users"
-    | "requests"
     | "none";
 };
 
@@ -75,10 +74,6 @@ export function buildNav(
     items.push({href: "/users", label: "Users", icon: "👤", match: "users"});
   }
 
-  if (access.showRequestsNav) {
-    items.push({href: "/requests", label: "Requests", icon: "📋", match: "requests"});
-  }
-
   return items;
 }
 
@@ -93,7 +88,6 @@ export function navItemActive(item: NavItem, pathname: string, tab: string | nul
   if (item.match === "invoices") return pathname === "/invoices";
   if (item.match === "artwork") return pathname === "/artwork-locker";
   if (item.match === "users") return pathname.startsWith("/users");
-  if (item.match === "requests") return pathname.startsWith("/requests");
   if (item.match === "prefix") return pathname.startsWith(item.href);
   return false;
 }

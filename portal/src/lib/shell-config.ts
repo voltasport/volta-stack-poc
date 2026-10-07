@@ -11,6 +11,7 @@ export type ShellConfig = {
   entityChoices: ShellEntity[];
   defaultEntitySlug: string;
   showAdminActions: boolean;
+  showCreateProgram: boolean;
 };
 
 function toShellEntity(entity: CatalogEntity): ShellEntity {
@@ -44,5 +45,6 @@ export function createShellConfig(
     entityChoices,
     defaultEntitySlug: entity.slug,
     showAdminActions: access.showAdminActions,
+    showCreateProgram: access.showAdminActions || access.showCreateProgram,
   };
 }

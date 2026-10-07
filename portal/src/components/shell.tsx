@@ -7,6 +7,7 @@ import {signOut} from "@/lib/auth-client";
 import {allSchools, entityBySlug, pendingSchool} from "@/lib/entities";
 import {navItemActive, type NavItem} from "@/lib/shell-nav";
 import type {ShellConfig, ShellEntity} from "@/lib/shell-config";
+import {NewProgramButton} from "@/components/new-program-button";
 
 const SIDEBAR_STORAGE_KEY = "volta-sidebar-collapsed";
 const SIDEBAR_WIDTH = 240;
@@ -345,16 +346,25 @@ export function Shell({
   );
 }
 
-export function AdminActions({show}: {show: boolean}) {
-  if (!show) return null;
+export function AdminActions({
+  show,
+  showCreateProgram = false,
+}: {
+  show: boolean;
+  showCreateProgram?: boolean;
+}) {
+  if (!show && !showCreateProgram) return null;
   return (
     <div className="flex flex-wrap gap-2 sm:pt-3">
-      <button
-        type="button"
-        className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
-      >
-        Share status link
-      </button>
+      {showCreateProgram ? <NewProgramButton /> : null}
+      {show ? (
+        <button
+          type="button"
+          className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
+        >
+          Share status link
+        </button>
+      ) : null}
     </div>
   );
 }

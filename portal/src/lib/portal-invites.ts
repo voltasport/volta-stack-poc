@@ -26,6 +26,16 @@ function baseUrl() {
   return process.env["BETTER_AUTH_URL"] ?? process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000";
 }
 
+export async function inviteTrackingReady() {
+  try {
+    await sql().query(`select invited_at from "user" limit 1`);
+    return true;
+  } catch (error) {
+    if (isMissingColumn(error, "invited_at")) return false;
+    throw error;
+  }
+}
+
 export async function listPortalUsersWithInviteMeta(): Promise<{
   users: PortalUserInviteRow[];
   inviteColumnsReady: boolean;

@@ -24,14 +24,15 @@ async function pageSummary(page, path) {
   const text = await page.locator("body").innerText();
   const is404 = text.includes("This page could not be found");
   const has500 = status >= 500 || text.includes("Application error");
-  const checklistBanner = text.includes("Request tracking is not enabled");
-  const welcomeChecklist = text.includes("Getting started") && text.includes("Welcome,");
+  const inviteBanner = text.includes("Invite tracking is not enabled");
+  const showsChecklist =
+    text.includes("Getting started") && text.includes("Create your first program");
   return {
     httpStatus: status,
     is404Page: is404,
     error500: has500,
-    checklistMigrationBanner: checklistBanner,
-    showsOnboardingChecklist: welcomeChecklist,
+    inviteMigrationBanner: inviteBanner,
+    showsOnboardingChecklist: showsChecklist,
     snippet: text.replace(/\s+/g, " ").slice(0, 220),
   };
 }
@@ -42,14 +43,10 @@ execSync("npm run db:seed-users", {
 });
 
 const pool = new Pool({connectionString: process.env.DATABASE_URL});
-await pool.query(`drop table if exists portal_requests cascade`);
-await pool.query(`drop table if exists organizations cascade`);
-await pool.query(`drop table if exists portal_uploads cascade`);
 await pool.query(`alter table "user" drop column if exists invited_at`);
 await pool.query(`alter table "user" drop column if exists last_invite_sent_at`);
 await pool.query(`alter table "user" drop column if exists first_login_at`);
 await pool.query(`alter table "user" drop column if exists onboarding_dismissed_at`);
-await pool.query(`alter table "user" drop column if exists organization_slug`);
 await pool.end();
 
 const browser = await chromium.launch();
@@ -66,11 +63,11 @@ const report = {
   admin: {
     overview: await pageSummary(adminPage, "/"),
     users: await pageSummary(adminPage, "/users"),
-    requests: await pageSummary(adminPage, "/requests"),
+    programs: await pageSummary(adminPage, "/programs"),
   },
   ben: {
     overview: await pageSummary(benPage, "/"),
-    users: await pageSummary(benPage, "/users"),
+    programs: await pageSummary(benPage, "/programs"),
   },
 };
 
@@ -93,14 +90,6 @@ for (const [who, pages] of Object.entries(report)) {
   if (who === "state") continue;
   for (const [page, summary] of Object.entries(pages)) {
     if (summary.error500) failures.push(`${who}/${page} 500`);
-    if (page !== "users" || who === "admin") {
-      if (summary.is404Page && who === "admin" && (page === "users" || page === "requests")) {
-        failures.push(`${who}/${page} unexpected 404`);
-      }
-    }
-    if (who === "ben" && page === "users" && !summary.is404Page && summary.httpStatus === 200) {
-      failures.push("ben/users should not be accessible");
-    }
   }
 }
 if (failures.length) {

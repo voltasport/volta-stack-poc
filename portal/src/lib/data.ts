@@ -6,6 +6,7 @@ export type Status = "On track" | "Needs you" | "Complete" | "Starting";
 export type TabId = "items" | "roster" | "proofs" | "files";
 
 export type RosterRow = {
+  id?: number;
   num: string;
   name: string;
   pos: string;

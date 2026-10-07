@@ -11,7 +11,6 @@ import {sql} from "@/lib/db";
 import {isMissingTable} from "@/lib/db-errors";
 import {type PortalRole} from "@/lib/roles";
 import {loadOnboardingDismissed, touchFirstLogin} from "@/lib/portal-invites";
-import {portalRequestsTableReady} from "@/lib/portal-requests";
 import {currentSession, resolvePortalRole} from "@/lib/session";
 
 export type AccessContext = {
@@ -28,11 +27,10 @@ export type AccessContext = {
   showApprovals: boolean;
   showArtworkLocker: boolean;
   showUsersNav: boolean;
-  showRequestsNav: boolean;
+  showCreateProgram: boolean;
   showOnboardingChecklist: boolean;
   /** True when assignment table is missing — login works; run db:migrate for scoping. */
   preMigrationMode: boolean;
-  requestsReady: boolean;
 };
 
 async function loadProgramSlugs(userId: string): Promise<{slugs: string[]; preMigration: boolean}> {
@@ -68,7 +66,6 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const email = session.user.email;
   const name = session.user.name ?? email;
   await touchFirstLogin(userId);
-  const requestsReady = await portalRequestsTableReady();
   const onboardingDismissed = await loadOnboardingDismissed(userId);
 
   if (role === "admin") {
@@ -85,10 +82,9 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showApprovals: true,
       showArtworkLocker: true,
       showUsersNav: true,
-      showRequestsNav: true,
+      showCreateProgram: true,
       showOnboardingChecklist: false,
       preMigrationMode: false,
-      requestsReady,
     };
   }
 
@@ -97,6 +93,27 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const allowedEntities = sidebarSchoolEntities().filter((entity) =>
     schoolSlugs.includes(entity.slug),
   );
+
+  const isDirectorOrManager = role === "director" || role === "manager";
+  let showOnboardingChecklist = isDirectorOrManager && !onboardingDismissed;
+  if (showOnboardingChecklist && !preMigration) {
+    const assigned = (await sql().query(
+      `select 1 from user_program_assignments where user_id = $1 limit 1`,
+      [userId],
+    )) as unknown[];
+    const hasProgram = assigned.length > 0;
+    let hasRoster = false;
+    if (hasProgram) {
+      const roster = (await sql().query(
+        `select 1 from roster_rows r
+         join user_program_assignments a on a.program_slug = r.program_slug
+         where a.user_id = $1 limit 1`,
+        [userId],
+      )) as unknown[];
+      hasRoster = roster.length > 0;
+    }
+    if (hasProgram && hasRoster) showOnboardingChecklist = false;
+  }
 
   return {
     userId,
@@ -111,11 +128,9 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     showApprovals: false,
     showArtworkLocker: false,
     showUsersNav: false,
-    showRequestsNav: false,
-    showOnboardingChecklist:
-      (role === "director" || role === "manager") && !onboardingDismissed,
+    showCreateProgram: isDirectorOrManager,
+    showOnboardingChecklist,
     preMigrationMode: preMigration,
-    requestsReady,
   };
 }
 

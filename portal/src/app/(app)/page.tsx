@@ -4,7 +4,12 @@ import {AdminActions, Segments, Shell, StatusPill} from "@/components/shell";
 import {OnboardingChecklist} from "@/components/onboarding-checklist";
 import {EmptyPage} from "@/components/portal-empty-states";
 import {isPendingAccess} from "@/lib/access";
-import {listPortalRequestsForUser} from "@/lib/portal-requests";
+import {inviteTrackingReady} from "@/lib/portal-invites";
+import {
+  primaryProgramSlugForUser,
+  userHasAssignedProgram,
+  userHasRosterOnAssignedPrograms,
+} from "@/lib/portal-programs";
 import {allSchools, entities, pendingSchool, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
 import {firstNameFromUser, overviewDateLine} from "@/lib/display-name";
@@ -18,13 +23,18 @@ export default async function OverviewPage() {
   const firstName = firstNameFromUser(access.name, access.email);
 
   if (access.showOnboardingChecklist) {
-    const userRequests = await listPortalRequestsForUser(access.userId);
+    const hasProgram = await userHasAssignedProgram(access.userId);
+    const hasRoster = hasProgram ? await userHasRosterOnAssignedPrograms(access.userId) : false;
+    const programSlug = hasProgram ? await primaryProgramSlugForUser(access.userId) : null;
+    const inviteColumnsReady = await inviteTrackingReady();
     return (
       <Shell config={shellConfig}>
         <OnboardingChecklist
           firstName={firstName}
-          requestsReady={access.requestsReady}
-          requests={userRequests.map((row) => ({type: row.type, status: row.status}))}
+          hasProgram={hasProgram}
+          hasRoster={hasRoster}
+          programSlug={programSlug}
+          inviteColumnsReady={inviteColumnsReady}
         />
       </Shell>
     );
@@ -88,7 +98,10 @@ export default async function OverviewPage() {
             Hello, {firstName}
           </h1>
         </div>
-        <AdminActions show={shellConfig.showAdminActions} />
+        <AdminActions
+          show={shellConfig.showAdminActions}
+          showCreateProgram={shellConfig.showCreateProgram}
+        />
       </div>
 
       {schools.length > 0 ? (

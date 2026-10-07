@@ -35,6 +35,10 @@ execSync("npm run db:seed-users", {
 
 const pool = new Pool({connectionString: process.env.DATABASE_URL});
 await pool.query(`update "user" set onboarding_dismissed_at = null where email = $1`, [BEN.email]);
+await pool.query(
+  `delete from user_program_assignments where user_id = (select id from "user" where email = $1)`,
+  [BEN.email],
+);
 await pool.end();
 
 const browser = await chromium.launch();
@@ -42,74 +46,66 @@ const benCtx = await browser.newContext();
 const benPage = await benCtx.newPage();
 await login(benCtx, BEN.email, BEN.password);
 
-async function submitBenRequests() {
-  const school = new FormData();
-  school.set("schoolName", "And Collar Academy");
-  await benCtx.request.post(`${base}/api/onboarding/school`, {multipart: school});
-  await benCtx.request.post(`${base}/api/onboarding/program`, {
-    data: {
-      sport: "Soccer",
-      level: "Varsity",
-      season: "Fall 2026",
-      rosterSize: "22",
-    },
-  });
-  const roster = new FormData();
-  roster.set("paste", "Name,Number\nAlex,10\nJordan,7");
-  await benCtx.request.post(`${base}/api/onboarding/roster`, {multipart: roster});
-  await benCtx.request.post(`${base}/api/onboarding/store`, {
-    data: {notes: "Home and away kits for fall season", targetDate: "August 2026"},
+await benCtx.request.post(`${base}/api/programs`, {
+  data: {
+    name: "And Collar Academy Soccer",
+    sport: "Soccer",
+    levelOrSeason: "Varsity · Fall 2026",
+    rosterSize: 22,
+  },
+});
+
+const pool2 = new Pool({connectionString: process.env.DATABASE_URL});
+const benSlug = (
+  await pool2.query(
+    `select program_slug from user_program_assignments a
+     join "user" u on u.id = a.user_id where u.email = $1 order by a.created_at desc limit 1`,
+    [BEN.email],
+  )
+).rows[0]?.program_slug;
+
+if (benSlug) {
+  await benCtx.request.post(`${base}/api/programs/${benSlug}/roster`, {
+    data: {paste: "Name,Number\nAlex,10\nJordan,7", mode: "append"},
   });
 }
-
-await submitBenRequests();
+await pool2.end();
 
 const adminCtx = await browser.newContext();
 const adminPage = await adminCtx.newPage();
 await login(adminCtx, LOCAL_TEST_ADMIN_EMAIL, passwords.admin);
 
 const usersStatus = await adminCtx.request.get(`${base}/users`);
-const requestsStatus = await adminCtx.request.get(`${base}/requests`);
-if (usersStatus.status() !== 200 || requestsStatus.status() !== 200) {
-  throw new Error(`Admin routes not 200: users=${usersStatus.status()} requests=${requestsStatus.status()}`);
+if (usersStatus.status() !== 200) {
+  throw new Error(`Admin users not 200: ${usersStatus.status()}`);
 }
 
-const pool2 = new Pool({connectionString: process.env.DATABASE_URL});
-const benId = (await pool2.query(`select id from "user" where email = $1`, [BEN.email])).rows[0]?.id;
-await adminCtx.request.post(`${base}/api/admin/users/${benId}/invite`, {
-  data: {sendEmail: true},
-});
-const invitedProbe = await pool2.query(
+const pool3 = new Pool({connectionString: process.env.DATABASE_URL});
+const invitedProbe = await pool3.query(
   `select id from "user" where email like 'invited-%@test.local' and first_login_at is null order by email limit 1`,
 );
 const invitedId = invitedProbe.rows[0]?.id;
+await pool3.end();
 if (invitedId) {
-  await adminCtx.request.post(`${base}/api/admin/users/${invitedId}/invite`, {
-    data: {sendEmail: false},
-  });
+  await adminCtx.request.post(`${base}/api/admin/users/${invitedId}/invite`, {data: {sendEmail: false}});
 }
-const pendingReq = await pool2.query(
-  `select id from portal_requests where user_id = $1 and status = 'pending' order by created_at limit 1`,
-  [benId],
-);
-const markId = pendingReq.rows[0]?.id;
-if (markId) {
-  await adminCtx.request.patch(`${base}/api/admin/requests/${markId}`, {
-    data: {},
-  });
-}
-await pool2.end();
 
 const shots = [];
 
 await adminPage.goto(`${base}/users`, {waitUntil: "networkidle"});
 shots.push(await shot(adminPage, "phase2-admin-users-invite-status"));
 
-await adminPage.goto(`${base}/requests`, {waitUntil: "networkidle"});
-shots.push(await shot(adminPage, "phase2-admin-requests-queue"));
+await adminPage.goto(`${base}/programs`, {waitUntil: "networkidle"});
+shots.push(await shot(adminPage, "phase2-admin-programs-new-button"));
 
 await benPage.goto(`${base}/`, {waitUntil: "networkidle"});
 shots.push(await shot(benPage, "phase2-ben-checklist-overview"));
+shots.push(await shot(benPage, "phase2-ben-checklist-mobile", true));
+
+if (benSlug) {
+  await benPage.goto(`${base}/programs/${benSlug}?tab=roster`, {waitUntil: "networkidle"});
+  shots.push(await shot(benPage, "phase2-ben-roster-editor"));
+}
 
 const previewDir = join(process.cwd(), ".data", "email-previews");
 try {
@@ -125,6 +121,6 @@ try {
   /* optional dev preview */
 }
 
-writeFileSync(`${out}/phase2-validation-shots.json`, JSON.stringify({shots}, null, 2));
+writeFileSync(`${out}/phase2-validation-shots.json`, JSON.stringify({shots, benSlug}, null, 2));
 await browser.close();
 console.log(JSON.stringify({shots}, null, 2));

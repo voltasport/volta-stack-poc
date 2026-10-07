@@ -15,10 +15,12 @@ export function ProgramDetail({
   program,
   initialTab = "items",
   showAdminActions = false,
+  canEditRoster = false,
 }: {
   program: Program;
   initialTab?: string;
   showAdminActions?: boolean;
+  canEditRoster?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,7 +115,7 @@ export function ProgramDetail({
       <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_280px]">
         <section className="min-w-0 rounded-3xl bg-white p-5">
           {tab === "items" ? <Items program={program} /> : null}
-          {tab === "roster" ? <Roster program={program} /> : null}
+          {tab === "roster" ? <Roster program={program} canEdit={canEditRoster} /> : null}
           {tab === "proofs" ? <Proofs program={program} /> : null}
           {tab === "files" ? <Files program={program} /> : null}
         </section>
@@ -175,17 +177,132 @@ function Items({program}: {program: Program}) {
   );
 }
 
-function Roster({program}: {program: Program}) {
+function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
+  const router = useRouter();
+  const [message, setMessage] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [paste, setPaste] = useState("");
+  const [num, setNum] = useState("");
+  const [name, setName] = useState("");
+  const [pos, setPos] = useState("");
+
+  async function addPlayer() {
+    setPending(true);
+    setError(null);
+    const res = await fetch(`/api/programs/${program.slug}/roster`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({num, name, pos}),
+    });
+    setPending(false);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      setError(payload?.error ?? "Could not add player");
+      return;
+    }
+    setNum("");
+    setName("");
+    setPos("");
+    setMessage("Player added.");
+    router.refresh();
+  }
+
+  async function importPaste(mode: "append" | "replace") {
+    setPending(true);
+    setError(null);
+    const res = await fetch(`/api/programs/${program.slug}/roster`, {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({paste, mode}),
+    });
+    setPending(false);
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null);
+      setError(payload?.error ?? "Could not import roster");
+      return;
+    }
+    setPaste("");
+    setMessage("Roster imported.");
+    router.refresh();
+  }
+
   const missing = program.roster.filter((row) => !row.submitted).length;
-  if (program.roster.length === 0) {
+  if (program.roster.length === 0 && !canEdit) {
     return <p className="text-sm text-[#6d7b8a]">Roster opens after kickoff.</p>;
   }
   return (
     <div>
       <h2 className="text-sm font-extrabold tracking-[0.08em]">ROSTER & SIZES</h2>
       <p className="mt-2 text-sm text-[#6d7b8a]">
-        Players fill these in from the sizing link. {missing} still missing.
+        {canEdit
+          ? "Add players manually or paste CSV. Sizing links can fill jersey sizes later."
+          : `Players fill these in from the sizing link. ${missing} still missing.`}
       </p>
+      {canEdit ? (
+        <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-[#f7f4ee] p-4">
+          <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">ADD PLAYER</p>
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              value={num}
+              onChange={(e) => setNum(e.target.value)}
+              placeholder="#"
+              className="rounded-xl border px-3 py-2 text-sm"
+            />
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Name"
+              className="col-span-2 rounded-xl border px-3 py-2 text-sm"
+            />
+            <input
+              value={pos}
+              onChange={(e) => setPos(e.target.value)}
+              placeholder="Pos"
+              className="rounded-xl border px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={pending}
+              onClick={() => void addPlayer()}
+              className="col-span-2 rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+            >
+              Add player
+            </button>
+          </div>
+          <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">IMPORT</p>
+          <textarea
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            rows={4}
+            placeholder="Name,Number&#10;Athlete,12"
+            className="rounded-xl border px-3 py-2 text-sm"
+          />
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={pending || !paste.trim()}
+              onClick={() => void importPaste("append")}
+              className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            >
+              Append import
+            </button>
+            <button
+              type="button"
+              disabled={pending || !paste.trim()}
+              onClick={() => void importPaste("replace")}
+              className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            >
+              Replace roster
+            </button>
+          </div>
+          {message ? <p className="text-sm font-semibold text-[#187243]">{message}</p> : null}
+          {error ? <p className="text-sm font-semibold text-[#9a3b3b]">{error}</p> : null}
+        </div>
+      ) : null}
+      {program.roster.length === 0 ? (
+        <p className="mt-4 text-sm text-[#6d7b8a]">No players yet.</p>
+      ) : null}
       <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
       <table className="w-full min-w-[640px] text-left text-sm">
         <thead className="text-xs text-[#7b8794]">
