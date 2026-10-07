@@ -15,17 +15,17 @@ export default async function StorePage({params}: {params: Promise<{slug: string
   if (products.length === 0) notFound();
 
   return (
-    <div style={{minHeight: "100vh", background: "#F6F4F0"}}>
-      <SiteHeader />
+    <div style={{minHeight: "100vh", background: "#F6F4F0", overflowX: "clip"}}>
+      <SiteHeader active="/stores" />
       <section style={{padding: "48px 0 80px"}}>
-        <div className="wrap">
-          <Link href="/stores" style={{textDecoration: "none", fontWeight: 700}}>
+        <div className="wrap" style={{minWidth: 0}}>
+          <Link href="/stores" className="link-muted" style={{fontWeight: 700}}>
             ← All stores
           </Link>
-          <h1 className="disp" style={{margin: "12px 0 8px", fontSize: "clamp(56px,7vw,96px)", color: "#101B2D"}}>
+          <h1 className="disp headline-page" style={{margin: "12px 0 8px", color: "#101B2D"}}>
             {entityBySlug(slug).name}
           </h1>
-          <p style={{color: "#4A5566", marginBottom: 28}}>
+          <p style={{color: "#4A5566", marginBottom: 28, maxWidth: 640}}>
             Official gear for this program. Checkout includes tax and Shop Pay where available.
           </p>
           <StoreBrowser name={entity.name} products={products} />

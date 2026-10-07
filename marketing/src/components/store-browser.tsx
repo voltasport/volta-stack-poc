@@ -33,7 +33,9 @@ export function StoreBrowser({
                 product.title
               )}
             </div>
-            <p style={{margin: "14px 0 0", fontWeight: 700}}>{product.title}</p>
+            <p className="store-product-title" style={{margin: "14px 0 0", fontWeight: 700}}>
+              {product.title}
+            </p>
             <div style={{display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 12}}>
               <span className="disp" style={{fontSize: 32, color: "#101B2D"}}>
                 {money(Number(product.price))}

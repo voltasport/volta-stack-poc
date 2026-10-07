@@ -13,30 +13,31 @@ export default async function StoresPage() {
     .filter((store) => store.products.length > 0 || store.entity.programs);
 
   return (
-    <div style={{minHeight: "100vh", background: "#F6F4F0"}}>
-      <SiteHeader />
-      <section style={{background: "#101B2D", color: "#F6F4F0", padding: "72px 0"}}>
+    <div style={{minHeight: "100vh", background: "#F6F4F0", overflowX: "clip"}}>
+      <SiteHeader active="/stores" />
+      <section style={{background: "#101B2D", color: "#F6F4F0", padding: "clamp(48px, 8vw, 72px) 0"}}>
         <div className="wrap">
           <p className="eyebrow" style={{color: "#58B077"}}>
             <span className="dot" /> Team stores
           </p>
-          <h1 className="disp" style={{margin: "16px 0 0", fontSize: "clamp(64px,8vw,120px)"}}>
+          <h1 className="disp headline-page" style={{margin: "16px 0 0"}}>
             One link. Every family.
           </h1>
           <p style={{maxWidth: 520, fontSize: 18, lineHeight: 1.5, color: "#B8C2D3"}}>
-            Your store, your colors. Families check out securely on your store. Coaches manage programs, proofs, and rosters in the program portal.
+            Your store, your colors. Families check out securely on your store. Coaches manage programs,
+            proofs, and rosters in the program portal.
           </p>
         </div>
       </section>
       <section style={{padding: "64px 0 96px"}}>
-        <div className="wrap" style={{display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 16}}>
+        <div className="wrap store-grid">
           {stores.map(({entity, products: gear}) => (
-            <article key={entity.slug} style={{background: "#fff", borderRadius: 24, padding: 24}}>
+            <article key={entity.slug} className="store-card" style={{background: "#fff", borderRadius: 24, padding: 24}}>
               <span className="tag tag-live">{entity.programs ? "Program portal + store" : "Team store"}</span>
-              <h2 className="disp" style={{fontSize: 40, color: "#101B2D", margin: "16px 0 8px"}}>
+              <h2 className="disp headline-section-sm" style={{color: "#101B2D", margin: "16px 0 8px"}}>
                 {entity.name}
               </h2>
-              <p style={{color: "#4A5566", minHeight: 48}}>
+              <p style={{color: "#4A5566", minHeight: 48, margin: 0}}>
                 {gear.length > 0
                   ? `${gear.length} items in this team store.`
                   : "Gear orders run through the program portal until your store catalog is live here."}
