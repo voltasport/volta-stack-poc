@@ -1,6 +1,7 @@
 import {chromium} from "playwright";
 import {mkdirSync, writeFileSync} from "node:fs";
 
+/** Use the same origin as `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` on the prod server. */
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
 const out = "/opt/cursor/artifacts";
 mkdirSync(out, {recursive: true});

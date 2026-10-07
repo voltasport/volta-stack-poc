@@ -48,6 +48,8 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       disableSignUp: true,
+      /** Required for invite/set-password links; admins copy URLs from the Users page when email is not configured. */
+      sendResetPassword: async () => {},
     },
     plugins: [
       admin({
@@ -68,7 +70,9 @@ function createAuth() {
     secret,
     baseURL: resolveAuthBaseURL(),
     rateLimit: {
-      enabled: process.env.NODE_ENV === "production",
+      enabled:
+        process.env.NODE_ENV === "production" &&
+        !/localhost|127\.0\.0\.1/.test(process.env["DATABASE_URL"] ?? ""),
       storage: "database",
       modelName: "rateLimit",
     },
