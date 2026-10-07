@@ -4,6 +4,18 @@ import {hashPassword} from "better-auth/crypto";
 import {neon} from "@neondatabase/serverless";
 import {Pool} from "pg";
 
+const LOCAL_ADMIN_EMAIL = "admin@test.local";
+
+function requireEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) {
+    throw new Error(
+      `Missing ${name}. Set it in the environment (e.g. portal/.env.local, gitignored). Do not commit passwords to the public repo.`,
+    );
+  }
+  return value;
+}
+
 function databaseUrl() {
   const fromEnv = process.env.DATABASE_URL;
   if (fromEnv) return fromEnv;
@@ -86,14 +98,21 @@ async function upsertUser(
 }
 
 async function main() {
+  const url = databaseUrl();
+  if (!/localhost|127\.0\.0\.1/.test(url)) {
+    throw new Error(
+      "db:seed-users is for local Postgres only. Refusing to run against a remote DATABASE_URL.",
+    );
+  }
+
   const sql = createSql();
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "VoltaAdmin123!";
-  const directorPassword = process.env.SEED_DIRECTOR_PASSWORD ?? "director-test-12";
-  const managerPassword = process.env.SEED_MANAGER_PASSWORD ?? "manager-test-12";
+  const adminPassword = requireEnv("SEED_ADMIN_PASSWORD");
+  const directorPassword = requireEnv("SEED_DIRECTOR_PASSWORD");
+  const managerPassword = requireEnv("SEED_MANAGER_PASSWORD");
 
   await upsertUser(sql, {
-    email: "admin@voltasport.co",
-    name: "Volta Admin",
+    email: LOCAL_ADMIN_EMAIL,
+    name: "Test Admin",
     role: "admin",
     password: adminPassword,
     programs: [],

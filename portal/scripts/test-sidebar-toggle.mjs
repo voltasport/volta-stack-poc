@@ -1,12 +1,16 @@
 import {chromium} from "playwright";
+import {LOCAL_TEST_ADMIN_EMAIL, seedPasswords} from "./require-seed-env.mjs";
+
+const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3000";
+const passwords = seedPasswords();
 
 const browser = await chromium.launch();
 const page = await browser.newPage({viewport: {width: 1440, height: 900}});
-await page.goto("http://localhost:3000/login", {waitUntil: "networkidle"});
-await page.fill('input[name="email"]', "admin@test.local");
-await page.fill('input[name="password"]', "admin-test-12");
+await page.goto(`${base}/login`, {waitUntil: "networkidle"});
+await page.fill('input[name="email"]', LOCAL_TEST_ADMIN_EMAIL);
+await page.fill('input[name="password"]', passwords.admin);
 await page.click('button[type="submit"]');
-await page.waitForURL("http://localhost:3000/", {timeout: 15000});
+await page.waitForURL(`${base}/`, {timeout: 15000});
 
 await page.getByRole("button", {name: "Collapse sidebar"}).click();
 await page.waitForTimeout(300);

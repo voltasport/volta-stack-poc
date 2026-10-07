@@ -1,6 +1,11 @@
 import {cookies} from "next/headers";
 import {notFound, redirect} from "next/navigation";
-import {allSchools, entities, entityBySlug, type CatalogEntity} from "@/lib/entities";
+import {
+  allSchools,
+  entityBySlug,
+  sidebarSchoolEntities,
+  type CatalogEntity,
+} from "@/lib/entities";
 import {sql} from "@/lib/db";
 import {isMissingTable} from "@/lib/db-errors";
 import {parsePortalRole, type PortalRole} from "@/lib/roles";
@@ -62,7 +67,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       email,
       programSlugs: null,
       schoolSlugs: null,
-      entities: [allSchools, ...entities],
+      entities: sidebarSchoolEntities(),
       canSeeAllSchools: true,
       showAdminActions: true,
       showApprovals: true,
@@ -74,7 +79,9 @@ export async function getAccessContext(): Promise<AccessContext | null> {
 
   const {slugs: programSlugs, preMigration} = await loadProgramSlugs(userId);
   const schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
-  const allowedEntities = entities.filter((entity) => schoolSlugs.includes(entity.slug));
+  const allowedEntities = sidebarSchoolEntities().filter((entity) =>
+    schoolSlugs.includes(entity.slug),
+  );
 
   return {
     userId,
@@ -82,7 +89,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     email,
     programSlugs: preMigration ? null : programSlugs,
     schoolSlugs: preMigration ? null : schoolSlugs,
-    entities: preMigration ? entities : allowedEntities,
+    entities: preMigration ? sidebarSchoolEntities() : allowedEntities,
     canSeeAllSchools: false,
     showAdminActions: false,
     showApprovals: false,
@@ -135,6 +142,7 @@ export async function resolveCurrentEntity(access: AccessContext): Promise<Catal
     return entityBySlug(slug);
   }
 
+  if (access.canSeeAllSchools) return allSchools;
   return access.entities[0] ?? entityBySlug(undefined);
 }
 
