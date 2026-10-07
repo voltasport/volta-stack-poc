@@ -175,28 +175,44 @@ a:hover {
   flex-direction: column;
   gap: 28px;
   padding-bottom: 72px;
+  overflow-x: clip;
 }
 
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 28px;
+  gap: 14px 20px;
   margin-top: 12px;
   width: 100%;
-  max-width: 520px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
-@media (min-width: 1100px) {
+/* Stacked hero: full-width copy can fit four stats in one row */
+@media (max-width: 1099px) {
   .hero-stats {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    max-width: none;
+    gap: 16px 20px;
+    max-width: min(100%, 720px);
   }
 }
 
+@media (max-width: 640px) {
+  .hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-width: 100%;
+  }
+}
+
+.hero-stat {
+  min-width: 0;
+}
+
 .hero-stat-value {
-  font-size: clamp(28px, 6vw, 52px);
+  font-size: clamp(1.125rem, 5.25cqi + 0.35rem, 2.35rem);
   color: #f6f4f0;
   line-height: 0.92;
+  white-space: nowrap;
 }
 
 .hero-stat-accent {

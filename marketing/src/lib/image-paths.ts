@@ -2,8 +2,8 @@
 export const marketingImages = {
   heroPlayer: "/images/hero-soccer-player.jpg",
   tileGameDay: "/images/utah-prep-home-kit.png",
-  tileTraining: "/images/davis-crewneck.png",
-  tileTeamStore: "/images/store-mock.jpg",
+  tileTraining: "/images/case-study-training.jpg",
+  tileTeamStore: "/images/utah-prep-backpack.png",
   proofThumb: "/images/utah-prep-home-kit.png",
   caseSoccer1: "/images/case-study-soccer-1.jpg",
   caseSoccer2: "/images/case-study-soccer-2.jpg",
