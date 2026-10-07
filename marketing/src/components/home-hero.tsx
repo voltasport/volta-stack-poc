@@ -30,27 +30,30 @@ export function HomeHero() {
                 See pricing
               </a>
             </div>
-            <div
-              className="rise"
-              style={{display: "flex", flexWrap: "wrap", gap: "36px", marginTop: "12px", animationDelay: ".4s"}}
-            >
-              <div>
-                <div className="disp" style={{fontSize: "clamp(36px, 8vw, 52px)", color: "#F6F4F0"}}>
-                  3<span style={{color: "#58B077"}}> days</span>
+            <div className="hero-stats rise" style={{animationDelay: ".4s"}}>
+              <div className="hero-stat">
+                <div className="disp hero-stat-value">
+                  3<span className="hero-stat-accent"> days</span>
                 </div>
-                <div style={{fontSize: "13px", color: "#B8C2D3", marginTop: "6px"}}>to first mockup</div>
+                <div className="hero-stat-label">to first mockup</div>
               </div>
-              <div>
-                <div className="disp" style={{fontSize: "clamp(36px, 8vw, 52px)", color: "#F6F4F0"}}>
-                  <span style={{color: "#58B077"}}>$</span>0
+              <div className="hero-stat">
+                <div className="disp hero-stat-value">
+                  <span className="hero-stat-accent">$</span>0
                 </div>
-                <div style={{fontSize: "13px", color: "#B8C2D3", marginTop: "6px"}}>design fees</div>
+                <div className="hero-stat-label">design fees</div>
               </div>
-              <div>
-                <div className="disp" style={{fontSize: "clamp(36px, 8vw, 52px)", color: "#F6F4F0"}}>
-                  35<span style={{color: "#58B077"}}>%</span>
+              <div className="hero-stat">
+                <div className="disp hero-stat-value">
+                  35<span className="hero-stat-accent">%</span>
                 </div>
-                <div style={{fontSize: "13px", color: "#B8C2D3", marginTop: "6px"}}>less than dealers</div>
+                <div className="hero-stat-label">less than dealers</div>
+              </div>
+              <div className="hero-stat">
+                <div className="disp hero-stat-value">
+                  12<span className="hero-stat-accent"> sports</span>
+                </div>
+                <div className="hero-stat-label">in one program roll-out</div>
               </div>
             </div>
           </div>
