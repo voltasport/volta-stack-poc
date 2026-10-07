@@ -17,5 +17,9 @@ export default async function AwayKitPage() {
       </Shell>
     );
   }
-  return <ProofApproval />;
+  return (
+    <Shell flush>
+      <ProofApproval />
+    </Shell>
+  );
 }

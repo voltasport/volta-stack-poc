@@ -1,5 +1,6 @@
-import {Pool, neonConfig} from "@neondatabase/serverless";
+import {Pool as NeonPool, neonConfig} from "@neondatabase/serverless";
 import {betterAuth} from "better-auth";
+import {Pool as PgPool} from "pg";
 import ws from "ws";
 
 // Node 20 has no global WebSocket. Vercel's Node 24 does, so this only
@@ -27,12 +28,19 @@ function assertRuntimeSecret(secret: string | undefined): void {
   }
 }
 
+function isLocalPostgres(url: string) {
+  return /localhost|127\.0\.0\.1/.test(url);
+}
+
 function database() {
   const connectionString = process.env["DATABASE_URL"];
   if (!connectionString) {
     throw new Error("DATABASE_URL is not set");
   }
-  return new Pool({connectionString});
+  if (isLocalPostgres(connectionString)) {
+    return new PgPool({connectionString});
+  }
+  return new NeonPool({connectionString});
 }
 
 function createAuth() {

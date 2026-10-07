@@ -8,8 +8,8 @@ export default function LoginPage() {
         <p className="text-xs font-extrabold tracking-[0.14em]">VOLTA PORTAL</p>
         <h1 className="mt-2 text-4xl font-black tracking-[-0.04em]">Sign in</h1>
         <p className="mt-2 text-sm leading-6 text-[#5d6b7a]">
-          Programs, proofs, and rosters stay behind this login. Team-store checkout stays on the
-          marketing site.
+          Sign in to track programs, approve proofs, and manage rosters. Team gear is available
+          under Team stores.
         </p>
         <Suspense fallback={null}>
           <LoginForm />

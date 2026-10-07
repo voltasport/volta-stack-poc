@@ -35,17 +35,17 @@ export function StoreGrid({
       <p className="text-sm text-[#6d7b8a]">Team store · {domain}</p>
       <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">{heading}</h1>
       <p className="mt-2 max-w-xl text-sm leading-6 text-[#3c4a5c]">
-        These products are live from the Shopify catalog. Continue in Shopify
-        opens the same checkout the Hydrogen proof uses.
+        Products are loaded from your Shopify catalog. Continue in Shopify to complete checkout
+        securely.
       </p>
-      <div className="mt-6 grid grid-cols-[minmax(0,1fr)_280px] gap-4">
-        <div className="flex flex-col gap-6">
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <div className="flex min-w-0 flex-col gap-6">
           {(sections ?? [{name: "", products}]).map((section) => (
             <section key={section.name || "products"}>
               {section.name ? (
                 <h2 className="mb-3 text-sm font-extrabold tracking-[0.08em]">{section.name}</h2>
               ) : null}
-              <ul className="grid grid-cols-2 gap-3">
+              <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {section.products.map((product) => (
             <li key={product.id} className="rounded-3xl bg-white p-4">
               <div className="grid h-36 place-items-center overflow-hidden rounded-2xl bg-[#efeae2]">
@@ -86,7 +86,7 @@ export function StoreGrid({
             </section>
           ))}
         </div>
-        <aside className="h-fit rounded-3xl bg-white p-5">
+        <aside className="h-fit rounded-3xl bg-white p-5 lg:sticky lg:top-24">
           <h2 className="text-sm font-extrabold tracking-[0.08em]">CART</h2>
           {lines.length === 0 ? (
             <p className="mt-3 text-sm text-[#6d7b8a]">Nothing in the cart yet.</p>
