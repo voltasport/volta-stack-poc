@@ -26,12 +26,17 @@ export default async function ProgramPage({
   const metrics = await getShellMetrics(access, entity);
   const shellConfig = createShellConfig(access, entity, metrics);
 
+  const canEditRoster =
+    access.role === "admin" ||
+    (access.programSlugs !== null && access.programSlugs.includes(slug));
+
   return (
     <Shell config={shellConfig}>
       <ProgramDetail
         program={program}
         initialTab={tab}
         showAdminActions={access.showAdminActions}
+        canEditRoster={canEditRoster}
       />
     </Shell>
   );

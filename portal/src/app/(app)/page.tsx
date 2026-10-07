@@ -1,8 +1,15 @@
 import Link from "next/link";
 import {getUpdates} from "@/lib/queries";
 import {AdminActions, Segments, Shell, StatusPill} from "@/components/shell";
+import {OnboardingChecklist} from "@/components/onboarding-checklist";
 import {EmptyPage} from "@/components/portal-empty-states";
 import {isPendingAccess} from "@/lib/access";
+import {inviteTrackingReady} from "@/lib/portal-invites";
+import {
+  primaryProgramSlugForUser,
+  userHasAssignedProgram,
+  userHasRosterOnAssignedPrograms,
+} from "@/lib/portal-programs";
 import {allSchools, entities, pendingSchool, productsForEntity} from "@/lib/entities";
 import {fetchShopifyProducts} from "@/lib/shopify";
 import {firstNameFromUser, overviewDateLine} from "@/lib/display-name";
@@ -15,6 +22,25 @@ export default async function OverviewPage() {
   const updates = await getUpdates();
   const firstName = firstNameFromUser(access.name, access.email);
 
+  if (access.showOnboardingChecklist) {
+    const hasProgram = await userHasAssignedProgram(access.userId);
+    const hasRoster = hasProgram ? await userHasRosterOnAssignedPrograms(access.userId) : false;
+    const programSlug = hasProgram ? await primaryProgramSlugForUser(access.userId) : null;
+    const inviteColumnsReady = await inviteTrackingReady();
+    return (
+      <Shell config={shellConfig}>
+        <OnboardingChecklist
+          firstName={firstName}
+          hasProgram={hasProgram}
+          hasRoster={hasRoster}
+          programSlug={programSlug}
+          inviteColumnsReady={inviteColumnsReady}
+          defaultOrganizationName={access.defaultOrganizationName}
+        />
+      </Shell>
+    );
+  }
+
   if (isPendingAccess(access) || entity.slug === pendingSchool.slug) {
     return (
       <Shell config={shellConfig}>
@@ -22,9 +48,6 @@ export default async function OverviewPage() {
           <p>
             Welcome to Volta — your portal is being set up. Your Volta rep will connect your
             programs shortly.
-          </p>
-          <p className="mt-3">
-            When programs are assigned, you&apos;ll see rosters, proofs, and team stores here.
           </p>
         </EmptyPage>
       </Shell>
@@ -44,10 +67,14 @@ export default async function OverviewPage() {
     );
   }
 
-  const catalog =
-    access.role === "admin" && entity.slug === allSchools.slug
-      ? await fetchShopifyProducts()
-      : null;
+  let catalog: Awaited<ReturnType<typeof fetchShopifyProducts>> | null = null;
+  if (access.role === "admin" && entity.slug === allSchools.slug) {
+    try {
+      catalog = await fetchShopifyProducts();
+    } catch {
+      catalog = null;
+    }
+  }
   const visibleSchools = access.canSeeAllSchools ? entities : access.entities;
   const schools = catalog
     ? visibleSchools.map((school) => ({
@@ -72,7 +99,11 @@ export default async function OverviewPage() {
             Hello, {firstName}
           </h1>
         </div>
-        <AdminActions show={shellConfig.showAdminActions} />
+        <AdminActions
+          show={shellConfig.showAdminActions}
+          showCreateProgram={shellConfig.showCreateProgram}
+          defaultOrganizationName={shellConfig.defaultOrganizationName}
+        />
       </div>
 
       {schools.length > 0 ? (

@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {createPortalUser} from "@/lib/admin-users";
+import {createPortalUser, deliverUserInvite} from "@/lib/admin-users";
 import {isPortalRole} from "@/lib/roles";
 
 export async function POST(request: Request) {
@@ -15,7 +15,13 @@ export async function POST(request: Request) {
       return NextResponse.json({error: "Invalid role"}, {status: 400});
     }
     const result = await createPortalUser({email, name, role});
-    return NextResponse.json(result);
+    const invite = await deliverUserInvite({
+      userId: result.user.id,
+      email: result.user.email,
+      name: result.user.name ?? name,
+      sendEmail: true,
+    });
+    return NextResponse.json({...result, invite});
   } catch (error) {
     return NextResponse.json(
       {error: error instanceof Error ? error.message : "Forbidden"},

@@ -7,10 +7,15 @@ import {
   sidebarSchoolEntities,
   type CatalogEntity,
 } from "@/lib/entities";
+import {
+  loadOrganizationEntities,
+  organizationNameFromEmail,
+} from "@/lib/portal-organizations";
 import {sql} from "@/lib/db";
-import {isMissingTable} from "@/lib/db-errors";
-import {parsePortalRole, type PortalRole} from "@/lib/roles";
-import {currentSession} from "@/lib/session";
+import {isMissingColumn, isMissingTable} from "@/lib/db-errors";
+import {type PortalRole} from "@/lib/roles";
+import {loadOnboardingDismissed, touchFirstLogin} from "@/lib/portal-invites";
+import {currentSession, resolvePortalRole} from "@/lib/session";
 
 export type AccessContext = {
   userId: string;
@@ -26,8 +31,11 @@ export type AccessContext = {
   showApprovals: boolean;
   showArtworkLocker: boolean;
   showUsersNav: boolean;
+  showCreateProgram: boolean;
+  showOnboardingChecklist: boolean;
   /** True when assignment table is missing — login works; run db:migrate for scoping. */
   preMigrationMode: boolean;
+  defaultOrganizationName: string;
 };
 
 async function loadProgramSlugs(userId: string): Promise<{slugs: string[]; preMigration: boolean}> {
@@ -54,14 +62,42 @@ async function loadSchoolSlugsForPrograms(programSlugs: string[]): Promise<strin
   return rows.map((row) => row.school_slug);
 }
 
+async function loadUserOrganizationSlug(userId: string): Promise<string | null> {
+  try {
+    const rows = (await sql().query(`select organization_slug from "user" where id = $1`, [
+      userId,
+    ])) as {organization_slug: string | null}[];
+    return rows[0]?.organization_slug ?? null;
+  } catch (error) {
+    if (isMissingColumn(error, "organization_slug") || isMissingTable(error, "portal_organizations")) {
+      return null;
+    }
+    throw error;
+  }
+}
+
+async function mergeEntitiesForSchoolSlugs(schoolSlugs: string[]): Promise<CatalogEntity[]> {
+  const uniqueSlugs = [...new Set(schoolSlugs)];
+  const staticMatches = sidebarSchoolEntities().filter((entity) =>
+    uniqueSlugs.includes(entity.slug),
+  );
+  const seen = new Set(staticMatches.map((entity) => entity.slug));
+  const dynamic = await loadOrganizationEntities(
+    uniqueSlugs.filter((slug) => !seen.has(slug)),
+  );
+  return [...staticMatches, ...dynamic];
+}
+
 export async function getAccessContext(): Promise<AccessContext | null> {
   const session = await currentSession();
   if (!session?.user) return null;
 
-  const role = parsePortalRole(session.user.role as string | undefined);
   const userId = session.user.id;
+  const role = await resolvePortalRole(userId, session.user.role as string | undefined);
   const email = session.user.email;
   const name = session.user.name ?? email;
+  await touchFirstLogin(userId);
+  const onboardingDismissed = await loadOnboardingDismissed(userId);
 
   if (role === "admin") {
     return {
@@ -77,15 +113,43 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showApprovals: true,
       showArtworkLocker: true,
       showUsersNav: true,
+      showCreateProgram: true,
+      showOnboardingChecklist: false,
       preMigrationMode: false,
+      defaultOrganizationName: organizationNameFromEmail(email),
     };
   }
 
   const {slugs: programSlugs, preMigration} = await loadProgramSlugs(userId);
-  const schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
-  const allowedEntities = sidebarSchoolEntities().filter((entity) =>
-    schoolSlugs.includes(entity.slug),
-  );
+  let schoolSlugs = await loadSchoolSlugsForPrograms(programSlugs);
+  const userOrgSlug = await loadUserOrganizationSlug(userId);
+  if (userOrgSlug && !schoolSlugs.includes(userOrgSlug)) {
+    schoolSlugs = [...schoolSlugs, userOrgSlug];
+  }
+  const allowedEntities = preMigration
+    ? sidebarSchoolEntities()
+    : await mergeEntitiesForSchoolSlugs(schoolSlugs);
+
+  const isDirectorOrManager = role === "director" || role === "manager";
+  let showOnboardingChecklist = isDirectorOrManager && !onboardingDismissed;
+  if (showOnboardingChecklist && !preMigration) {
+    const assigned = (await sql().query(
+      `select 1 from user_program_assignments where user_id = $1 limit 1`,
+      [userId],
+    )) as unknown[];
+    const hasProgram = assigned.length > 0;
+    let hasRoster = false;
+    if (hasProgram) {
+      const roster = (await sql().query(
+        `select 1 from roster_rows r
+         join user_program_assignments a on a.program_slug = r.program_slug
+         where a.user_id = $1 limit 1`,
+        [userId],
+      )) as unknown[];
+      hasRoster = roster.length > 0;
+    }
+    if (hasProgram && hasRoster) showOnboardingChecklist = false;
+  }
 
   return {
     userId,
@@ -94,13 +158,16 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     name,
     programSlugs: preMigration ? null : programSlugs,
     schoolSlugs: preMigration ? null : schoolSlugs,
-    entities: preMigration ? sidebarSchoolEntities() : allowedEntities,
+    entities: allowedEntities,
     canSeeAllSchools: false,
     showAdminActions: false,
     showApprovals: false,
     showArtworkLocker: false,
     showUsersNav: false,
+    showCreateProgram: isDirectorOrManager,
+    showOnboardingChecklist,
     preMigrationMode: preMigration,
+    defaultOrganizationName: organizationNameFromEmail(email),
   };
 }
 
@@ -156,7 +223,7 @@ export async function resolveCurrentEntity(access: AccessContext): Promise<Catal
   }
 
   if (slug && access.entities.some((entity) => entity.slug === slug)) {
-    return entityBySlug(slug);
+    return access.entities.find((entity) => entity.slug === slug)!;
   }
 
   if (access.canSeeAllSchools) return allSchools;

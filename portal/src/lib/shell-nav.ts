@@ -6,7 +6,15 @@ export type NavItem = {
   icon: string;
   count?: string;
   alert?: boolean;
-  match: "exact" | "programs" | "roster" | "prefix" | "invoices" | "artwork" | "users" | "none";
+  match:
+    | "exact"
+    | "programs"
+    | "roster"
+    | "prefix"
+    | "invoices"
+    | "artwork"
+    | "users"
+    | "none";
 };
 
 function countLabel(value: number) {

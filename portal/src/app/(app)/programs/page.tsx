@@ -1,6 +1,6 @@
 import Link from "next/link";
 import {redirect} from "next/navigation";
-import {Shell, StatusPill} from "@/components/shell";
+import {AdminActions, Shell, StatusPill} from "@/components/shell";
 import {EmptyPage} from "@/components/portal-empty-states";
 import {isPendingAccess} from "@/lib/access";
 import {allSchools, pendingSchool} from "@/lib/entities";
@@ -33,10 +33,21 @@ export default async function ProgramsPage({
       <Shell config={shellConfig}>
         <EmptyPage title={isRoster ? "Rosters" : "Programs"}>
           <p>
-            {isRoster
-              ? "Rosters will show up here once your Volta rep assigns programs to your account."
-              : "Programs will show up here once your Volta rep connects them to your account."}
+            {shellConfig.showCreateProgram
+              ? "Create your first program to get started — it will show up here and under Rosters."
+              : isRoster
+                ? "Rosters will show up here once programs are assigned to your account."
+                : "Programs will show up here once they are connected to your account."}
           </p>
+          {shellConfig.showCreateProgram ? (
+            <div className="mt-4">
+              <AdminActions
+                show={false}
+                showCreateProgram
+                defaultOrganizationName={shellConfig.defaultOrganizationName}
+              />
+            </div>
+          ) : null}
         </EmptyPage>
       </Shell>
     );
@@ -45,9 +56,16 @@ export default async function ProgramsPage({
   return (
     <Shell config={shellConfig}>
       {eyebrow ? <p className="text-sm text-[#6d7b8a]">{eyebrow}</p> : null}
-      <h1 className="mt-1 text-4xl font-black tracking-[-0.04em]">
-        {isRoster ? "ROSTERS" : "PROGRAMS"}
-      </h1>
+      <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <h1 className="text-4xl font-black tracking-[-0.04em]">
+          {isRoster ? "ROSTERS" : "PROGRAMS"}
+        </h1>
+        <AdminActions
+          show={shellConfig.showAdminActions}
+          showCreateProgram={shellConfig.showCreateProgram}
+          defaultOrganizationName={shellConfig.defaultOrganizationName}
+        />
+      </div>
       {programs.length === 0 ? (
         <p className="mt-4 max-w-xl text-sm leading-6 text-[#3c4a5c]">
           {isRoster

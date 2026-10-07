@@ -3,6 +3,7 @@ import {betterAuth} from "better-auth";
 import {admin} from "better-auth/plugins";
 import {Pool as PgPool} from "pg";
 import ws from "ws";
+import {sendResetPasswordEmail} from "@/lib/email/password-reset-mailer";
 
 if (typeof WebSocket === "undefined") {
   neonConfig.webSocketConstructor = ws;
@@ -48,8 +49,13 @@ function createAuth() {
     emailAndPassword: {
       enabled: true,
       disableSignUp: true,
-      /** Required for invite/set-password links; admins copy URLs from the Users page when email is not configured. */
-      sendResetPassword: async () => {},
+      sendResetPassword: async ({user, url}) => {
+        await sendResetPasswordEmail({
+          email: user.email,
+          name: user.name ?? user.email,
+          url,
+        });
+      },
     },
     plugins: [
       admin({

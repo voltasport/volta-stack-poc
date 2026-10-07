@@ -1,18 +1,20 @@
 import {headers} from "next/headers";
 import {getAuth} from "@/lib/auth";
 import {sql} from "@/lib/db";
-import {currentSession} from "@/lib/session";
-
-function baseUrl() {
-  return process.env["BETTER_AUTH_URL"] ?? process.env["NEXT_PUBLIC_APP_URL"] ?? "http://localhost:3000";
-}
+import {getAccessContext} from "@/lib/access";
+import {
+  createSetPasswordUrl,
+  currentInviterName,
+  recordInviteSent,
+  sendInviteEmailToUser,
+} from "@/lib/portal-invites";
 
 async function requireAdminSession() {
-  const session = await currentSession();
-  if (session?.user.role !== "admin") {
+  const access = await getAccessContext();
+  if (!access || access.role !== "admin") {
     throw new Error("Forbidden");
   }
-  return session;
+  return access;
 }
 
 export async function createPortalUser(input: {
@@ -41,26 +43,42 @@ export async function createPortalUser(input: {
 
 export async function generatePasswordResetLink(email: string) {
   await requireAdminSession();
-  const auth = getAuth();
-  const redirectTo = `${baseUrl()}/reset-password`;
-  await auth.api.requestPasswordReset({
-    body: {email, redirectTo},
-    headers: await headers(),
-  });
-  const rows = (await sql().query(
-    `select identifier from verification
-     where identifier like 'reset-password:%'
-     order by "createdAt" desc
-     limit 1`,
-  )) as {identifier: string}[];
-  const identifier = rows[0]?.identifier;
-  if (!identifier) {
-    throw new Error("Could not create reset link. Check that the user exists.");
+  return createSetPasswordUrl(email);
+}
+
+export async function deliverUserInvite(input: {
+  userId: string;
+  email: string;
+  name: string;
+  sendEmail: boolean;
+}) {
+  await requireAdminSession();
+  const inviterName = await currentInviterName();
+  if (input.sendEmail) {
+    const result = await sendInviteEmailToUser({
+      userId: input.userId,
+      email: input.email,
+      name: input.name,
+      inviterName,
+    });
+    return {
+      url: result.url,
+      emailSent: result.delivery.sent,
+      emailConfigured: result.delivery.sent || result.delivery.reason !== "not_configured",
+      detail:
+        result.delivery.sent
+          ? "Invite email sent."
+          : result.delivery.reason === "not_configured"
+            ? "Email not configured, copy the link instead."
+            : (result.delivery.detail ?? "Email failed; copy the link instead."),
+    };
   }
-  const token = identifier.replace("reset-password:", "");
-  const params = new URLSearchParams({
-    callbackURL: "/",
-    email,
-  });
-  return `${baseUrl()}/reset-password/${token}?${params.toString()}`;
+  const url = await createSetPasswordUrl(input.email);
+  await recordInviteSent(input.userId);
+  return {
+    url,
+    emailSent: false,
+    emailConfigured: false,
+    detail: "Set-password link ready to copy.",
+  };
 }
