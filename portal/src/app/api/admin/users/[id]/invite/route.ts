@@ -1,12 +1,12 @@
 import {NextResponse} from "next/server";
+import {getAccessContext} from "@/lib/access";
 import {deliverUserInvite} from "@/lib/admin-users";
 import {sql} from "@/lib/db";
-import {currentSession} from "@/lib/session";
 
 export async function POST(request: Request, {params}: {params: Promise<{id: string}>}) {
   try {
-    const session = await currentSession();
-    if (session?.user.role !== "admin") {
+    const access = await getAccessContext();
+    if (!access || access.role !== "admin") {
       return NextResponse.json({error: "Forbidden"}, {status: 403});
     }
     const {id} = await params;

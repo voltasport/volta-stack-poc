@@ -1,7 +1,7 @@
 import {headers} from "next/headers";
 import {getAuth} from "@/lib/auth";
 import {sql} from "@/lib/db";
-import {currentSession} from "@/lib/session";
+import {getAccessContext} from "@/lib/access";
 import {
   createSetPasswordUrl,
   currentInviterName,
@@ -10,11 +10,11 @@ import {
 } from "@/lib/portal-invites";
 
 async function requireAdminSession() {
-  const session = await currentSession();
-  if (session?.user.role !== "admin") {
+  const access = await getAccessContext();
+  if (!access || access.role !== "admin") {
     throw new Error("Forbidden");
   }
-  return session;
+  return access;
 }
 
 export async function createPortalUser(input: {

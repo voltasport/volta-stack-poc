@@ -1,6 +1,6 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
-import {saveOnboardingLogo} from "@/lib/onboarding-uploads";
+import {savePortalUpload} from "@/lib/portal-uploads";
 import {createPortalRequest} from "@/lib/portal-requests";
 
 export async function POST(request: Request) {
@@ -15,16 +15,20 @@ export async function POST(request: Request) {
     if (!schoolName) {
       return NextResponse.json({error: "School name is required"}, {status: 400});
     }
-    let logoPath: string | null = null;
+    let logoUploadId: string | null = null;
     const logo = form.get("logo");
     if (logo instanceof File && logo.size > 0) {
       const bytes = Buffer.from(await logo.arrayBuffer());
-      logoPath = saveOnboardingLogo(access.userId, bytes, logo.type || "application/octet-stream");
+      logoUploadId = await savePortalUpload({
+        userId: access.userId,
+        bytes,
+        contentType: logo.type || "application/octet-stream",
+      });
     }
     const result = await createPortalRequest({
       userId: access.userId,
       type: "school",
-      payload: {schoolName, logoPath},
+      payload: {schoolName, logoUploadId},
     });
     if (!result.ok) {
       return NextResponse.json({error: result.error}, {status: 503});

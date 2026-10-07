@@ -56,10 +56,14 @@ export default async function OverviewPage() {
     );
   }
 
-  const catalog =
-    access.role === "admin" && entity.slug === allSchools.slug
-      ? await fetchShopifyProducts()
-      : null;
+  let catalog: Awaited<ReturnType<typeof fetchShopifyProducts>> | null = null;
+  if (access.role === "admin" && entity.slug === allSchools.slug) {
+    try {
+      catalog = await fetchShopifyProducts();
+    } catch {
+      catalog = null;
+    }
+  }
   const visibleSchools = access.canSeeAllSchools ? entities : access.entities;
   const schools = catalog
     ? visibleSchools.map((school) => ({

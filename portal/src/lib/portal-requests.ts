@@ -121,13 +121,15 @@ export async function completePortalRequest(input: {
       if (existing[0]) {
         slug = `${slug}-${randomBytes(3).toString("hex")}`;
       }
-      const logoPath = row.payload.logoPath ?? row.payload.logo_path ?? null;
+      const logoUploadId = row.payload.logoUploadId ?? row.payload.logo_upload_id ?? null;
       try {
         await sql().query(
-          `insert into organizations (slug, name, logo_path)
+          `insert into organizations (slug, name, logo_upload_id)
            values ($1, $2, $3)
-           on conflict (slug) do update set name = excluded.name, logo_path = coalesce(excluded.logo_path, organizations.logo_path)`,
-          [slug, schoolName, logoPath],
+           on conflict (slug) do update set
+             name = excluded.name,
+             logo_upload_id = coalesce(excluded.logo_upload_id, organizations.logo_upload_id)`,
+          [slug, schoolName, logoUploadId],
         );
         await sql().query(
           `update "user" set organization_slug = $2, "updatedAt" = now() where id = $1`,

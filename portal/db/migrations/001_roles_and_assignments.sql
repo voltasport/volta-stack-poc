@@ -29,7 +29,7 @@ where lower(email) = 'admin@voltasport.co';
 update "user"
 set role = 'director'
 where role = 'admin'
-  and lower(email) <> 'admin@voltasport.co';
+  and lower(email) not in ('admin@voltasport.co', 'admin@test.local');
 
 update "user"
 set role = 'director'

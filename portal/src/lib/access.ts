@@ -9,10 +9,10 @@ import {
 } from "@/lib/entities";
 import {sql} from "@/lib/db";
 import {isMissingTable} from "@/lib/db-errors";
-import {parsePortalRole, type PortalRole} from "@/lib/roles";
+import {type PortalRole} from "@/lib/roles";
 import {loadOnboardingDismissed, touchFirstLogin} from "@/lib/portal-invites";
 import {portalRequestsTableReady} from "@/lib/portal-requests";
-import {currentSession} from "@/lib/session";
+import {currentSession, resolvePortalRole} from "@/lib/session";
 
 export type AccessContext = {
   userId: string;
@@ -63,8 +63,8 @@ export async function getAccessContext(): Promise<AccessContext | null> {
   const session = await currentSession();
   if (!session?.user) return null;
 
-  const role = parsePortalRole(session.user.role as string | undefined);
   const userId = session.user.id;
+  const role = await resolvePortalRole(userId, session.user.role as string | undefined);
   const email = session.user.email;
   const name = session.user.name ?? email;
   await touchFirstLogin(userId);
@@ -85,7 +85,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
       showApprovals: true,
       showArtworkLocker: true,
       showUsersNav: true,
-      showRequestsNav: requestsReady,
+      showRequestsNav: true,
       showOnboardingChecklist: false,
       preMigrationMode: false,
       requestsReady,

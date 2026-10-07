@@ -24,15 +24,30 @@ class ResendEmailSender implements EmailSender {
   }
 }
 
-class LogEmailSender implements EmailSender {
+class ConsoleEmailSender implements EmailSender {
+  async send(message: OutboundEmail) {
+    console.info(
+      `[portal-email] not configured — would send to ${message.to}: "${message.subject}" (use copy-link on Users page)`,
+    );
+    return {id: "console"};
+  }
+}
+
+class DevFileEmailSender implements EmailSender {
   async send(message: OutboundEmail) {
     const dir = join(process.cwd(), ".data", "email-previews");
-    mkdirSync(dir, {recursive: true});
     const stamp = Date.now();
     const safe = message.to.replace(/[^a-z0-9]+/gi, "-").slice(0, 40);
-    writeFileSync(join(dir, `${stamp}-${safe}.html`), message.html, "utf8");
-    writeFileSync(join(dir, `${stamp}-${safe}.txt`), message.text, "utf8");
-    console.info(`[portal-email] logged preview for ${message.to}: ${message.subject}`);
+    try {
+      mkdirSync(dir, {recursive: true});
+      writeFileSync(join(dir, `${stamp}-${safe}.html`), message.html, "utf8");
+      writeFileSync(join(dir, `${stamp}-${safe}.txt`), message.text, "utf8");
+      console.info(`[portal-email] dev preview written for ${message.to}: ${message.subject}`);
+    } catch (error) {
+      console.info(
+        `[portal-email] not configured — preview write failed (${error instanceof Error ? error.message : "error"}); subject "${message.subject}" to ${message.to}`,
+      );
+    }
     return {id: `log-${stamp}`};
   }
 }
@@ -50,7 +65,14 @@ export function createConfiguredSender(): EmailSender | null {
   return null;
 }
 
-/** Resend when configured; otherwise log previews locally (never throws for missing config). */
+function fallbackSender(): EmailSender {
+  if (process.env.NODE_ENV === "production") {
+    return new ConsoleEmailSender();
+  }
+  return new DevFileEmailSender();
+}
+
+/** Resend when configured; otherwise console (prod) or dev file preview (non-prod). Never throws for missing config. */
 export async function deliverEmail(message: OutboundEmail): Promise<EmailDeliveryResult> {
   const configured = createConfiguredSender();
   if (configured) {
@@ -66,13 +88,13 @@ export async function deliverEmail(message: OutboundEmail): Promise<EmailDeliver
     }
   }
   try {
-    await new LogEmailSender().send(message);
+    await fallbackSender().send(message);
     return {sent: false, reason: "not_configured"};
   } catch (error) {
     return {
       sent: false,
       reason: "failed",
-      detail: error instanceof Error ? error.message : "Log failed",
+      detail: error instanceof Error ? error.message : "Fallback failed",
     };
   }
 }

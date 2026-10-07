@@ -1,5 +1,5 @@
 import {NextResponse} from "next/server";
-import {currentSession} from "@/lib/session";
+import {getAccessContext} from "@/lib/access";
 import {isPortalRole} from "@/lib/roles";
 import {setUserAssignments, setUserRole} from "@/lib/queries";
 
@@ -7,8 +7,8 @@ export async function PATCH(
   request: Request,
   {params}: {params: Promise<{id: string}>},
 ) {
-  const session = await currentSession();
-  if (session?.user.role !== "admin") {
+  const access = await getAccessContext();
+  if (!access || access.role !== "admin") {
     return NextResponse.json({error: "Forbidden"}, {status: 403});
   }
   const {id} = await params;
@@ -17,7 +17,7 @@ export async function PATCH(
     if (!isPortalRole(body.role)) {
       return NextResponse.json({error: "Invalid role"}, {status: 400});
     }
-    if (id === session.user.id && body.role !== "admin") {
+    if (id === access.userId && body.role !== "admin") {
       return NextResponse.json({error: "Cannot demote your own admin account"}, {status: 400});
     }
     await setUserRole(id, body.role);
