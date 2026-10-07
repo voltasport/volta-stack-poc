@@ -1,0 +1,26 @@
+import type {AccessContext} from "@/lib/access";
+import type {CatalogEntity} from "@/lib/entities";
+import {getPrograms, getTasks} from "@/lib/queries";
+
+export type ShellMetrics = {
+  programs: Awaited<ReturnType<typeof getPrograms>>;
+  programCount: number;
+  approvalCount: number;
+};
+
+export async function getShellMetrics(
+  access: AccessContext,
+  entity: CatalogEntity,
+): Promise<ShellMetrics> {
+  const schoolFilter = entity.slug === "all" ? undefined : entity.slug;
+  const programs = await getPrograms(access, schoolFilter);
+  const tasks = await getTasks(access);
+  const approvalCount = access.showApprovals
+    ? tasks.filter((task) => task.href.startsWith("/approvals")).length
+    : 0;
+  return {
+    programs,
+    programCount: programs.length,
+    approvalCount,
+  };
+}

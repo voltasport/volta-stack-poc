@@ -1,11 +1,21 @@
 import Link from "next/link";
+import {redirect} from "next/navigation";
 import {Shell, StatusPill} from "@/components/shell";
 import {loadPortalPage} from "@/lib/page-shell";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProgramsPage() {
+export default async function ProgramsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{tab?: string}>;
+}) {
+  const {tab} = await searchParams;
   const {entity, programs, shellConfig} = await loadPortalPage();
+
+  if (tab === "roster" && programs[0]) {
+    redirect(`/programs/${programs[0].slug}?tab=roster`);
+  }
 
   return (
     <Shell config={shellConfig}>

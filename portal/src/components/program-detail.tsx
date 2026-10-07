@@ -99,6 +99,7 @@ export function ProgramDetail({
               else params.set("tab", item.id);
               const query = params.toString();
               router.replace(query ? `${pathname}?${query}` : pathname, {scroll: false});
+              requestAnimationFrame(() => window.dispatchEvent(new Event("volta-url-updated")));
             }}
             className={`rounded-full px-4 py-1.5 text-sm font-semibold ${
               tab === item.id ? "bg-[#122033] text-white" : "text-[#3c4a5c]"

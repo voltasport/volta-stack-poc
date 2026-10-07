@@ -1,19 +1,16 @@
 import {ProofApproval} from "@/components/proof-approval";
 import {Shell} from "@/components/shell";
-import {requireAdmin} from "@/lib/access";
+import {requireAdmin, resolveCurrentEntity} from "@/lib/access";
 import {createShellConfig} from "@/lib/shell-config";
-import {getProgramSlugs, getPrograms, getTasks} from "@/lib/queries";
-import {resolveCurrentEntity} from "@/lib/access";
+import {getShellMetrics} from "@/lib/shell-metrics";
 
 export const dynamic = "force-dynamic";
 
 export default async function AwayKitPage() {
   const access = await requireAdmin();
   const entity = await resolveCurrentEntity(access);
-  const programs = await getPrograms(access);
-  const tasks = await getTasks(access);
-  const rosterSlug = programs[0]?.slug ?? (await getProgramSlugs(access))[0];
-  const shellConfig = createShellConfig(access, entity, programs.length, tasks.length, rosterSlug);
+  const metrics = await getShellMetrics(access, entity);
+  const shellConfig = createShellConfig(access, entity, metrics);
 
   return (
     <Shell config={shellConfig} flush>
