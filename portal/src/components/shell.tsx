@@ -3,55 +3,27 @@
 import Link from "next/link";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {Suspense, useCallback, useEffect, useState} from "react";
-import {signOut, useSession} from "@/lib/auth-client";
-import {allSchools, entities, entityBySlug} from "@/lib/entities";
+import {signOut} from "@/lib/auth-client";
+import {allSchools, entityBySlug, type CatalogEntity} from "@/lib/entities";
+import {navItemActive, type NavItem} from "@/lib/shell-nav";
+import type {ShellConfig} from "@/lib/shell-config";
 
 const SIDEBAR_STORAGE_KEY = "volta-sidebar-collapsed";
 const SIDEBAR_WIDTH = 240;
 const SIDEBAR_COLLAPSED_WIDTH = 72;
 
-const nav = [
-  {href: "/", label: "Overview", icon: "◉", match: "exact" as const},
-  {href: "/programs", label: "Programs", icon: "▦", count: "4", match: "programs" as const},
-  {
-    href: "/approvals/away-kit",
-    label: "Approvals",
-    icon: "✓",
-    count: "1",
-    alert: true,
-    match: "prefix" as const,
-  },
-  {
-    href: "/programs/womens-soccer?tab=roster",
-    label: "Rosters",
-    icon: "☰",
-    count: "4",
-    alert: true,
-    match: "roster" as const,
-  },
-  {href: "/store", label: "Team stores", icon: "▣", match: "prefix" as const},
-  {href: "/programs/cross-country?tab=files", label: "Invoices", icon: "⎘", match: "none" as const},
-  {
-    href: "/programs/cross-country?tab=files",
-    label: "Artwork locker",
-    icon: "▤",
-    match: "none" as const,
-  },
-];
-
 function EntitySwitcher({
   slug,
-  includeAll,
+  choices,
   collapsed,
   onChange,
 }: {
   slug: string;
-  includeAll: boolean;
+  choices: CatalogEntity[];
   collapsed: boolean;
   onChange: (slug: string) => void;
 }) {
   const router = useRouter();
-  const choices = includeAll ? [allSchools, ...entities] : entities;
   const entity = choices.find((item) => item.slug === slug) ?? choices[0];
 
   return (
@@ -88,10 +60,12 @@ function EntitySwitcher({
 }
 
 function SidebarPanel({
+  config,
   collapsed,
   onToggleCollapsed,
   onNavigate,
 }: {
+  config: ShellConfig;
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onNavigate?: () => void;
@@ -100,29 +74,22 @@ function SidebarPanel({
   const router = useRouter();
   const search = useSearchParams();
   const tab = search.get("tab");
-  const {data: session, isPending} = useSession();
-  const isAdmin = (session?.user as {role?: string} | undefined)?.role === "admin";
-  const [slug, setSlug] = useState(entities[0].slug);
+  const [slug, setSlug] = useState(config.defaultEntitySlug);
 
   useEffect(() => {
-    if (isPending) return;
     const row = document.cookie.split("; ").find((entry) => entry.startsWith("volta_entity="));
     const fromCookie = row ? decodeURIComponent(row.slice("volta_entity=".length)) : null;
-    if (fromCookie === allSchools.slug && !isAdmin) {
-      setSlug(entities[0].slug);
-      return;
-    }
-    if (fromCookie) {
+    const allowed = config.entityChoices.some((item) => item.slug === fromCookie);
+    if (fromCookie && allowed) {
       setSlug(fromCookie);
       return;
     }
-    if (isAdmin) {
-      document.cookie = `volta_entity=${allSchools.slug}; path=/; max-age=31536000; samesite=lax`;
-      setSlug(allSchools.slug);
-    }
-  }, [isAdmin, isPending]);
+    setSlug(config.defaultEntitySlug);
+    document.cookie = `volta_entity=${encodeURIComponent(config.defaultEntitySlug)}; path=/; max-age=31536000; samesite=lax`;
+  }, [config.defaultEntitySlug, config.entityChoices]);
 
   const entity = entityBySlug(slug);
+  const showCounts = entity.slug !== allSchools.slug || config.entityChoices.includes(allSchools);
 
   return (
     <>
@@ -153,20 +120,16 @@ function SidebarPanel({
         </button>
       </div>
 
-      <EntitySwitcher slug={slug} includeAll={isAdmin} collapsed={collapsed} onChange={setSlug} />
+      <EntitySwitcher
+        slug={slug}
+        choices={config.entityChoices}
+        collapsed={collapsed}
+        onChange={setSlug}
+      />
 
       <nav className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
-        {nav.map((item) => {
-          const active =
-            item.match === "exact"
-              ? pathname === "/"
-              : item.match === "programs"
-                ? pathname.startsWith("/programs") && tab !== "roster"
-                : item.match === "roster"
-                  ? tab === "roster"
-                  : item.match === "prefix"
-                    ? pathname.startsWith(item.href)
-                    : false;
+        {config.nav.map((item: NavItem) => {
+          const active = navItemActive(item, pathname, tab);
           return (
             <Link
               key={item.label}
@@ -185,7 +148,7 @@ function SidebarPanel({
                 </span>
                 {!collapsed ? <span className="truncate">{item.label}</span> : null}
               </span>
-              {!collapsed && item.count && entity.programs ? (
+              {!collapsed && item.count && showCounts ? (
                 <span
                   className={`grid h-5 min-w-5 shrink-0 place-items-center rounded-full px-1 text-[11px] font-bold ${
                     item.alert ? "bg-[#3dcb7a] text-[#0c1726]" : "text-[#8aa0b5]"
@@ -203,7 +166,7 @@ function SidebarPanel({
         <button
           type="button"
           aria-label="Sign out"
-          className={`mb-2 w-full rounded-lg text-xs font-semibold text-[#9eb0c2] hover:bg-white/5 hover:text-white ${
+          className={`w-full rounded-lg text-xs font-semibold text-[#9eb0c2] hover:bg-white/5 hover:text-white ${
             collapsed ? "px-1 py-2 text-center leading-tight" : "px-1 py-1.5 text-left"
           }`}
           onClick={async () => {
@@ -214,37 +177,19 @@ function SidebarPanel({
         >
           Sign out
         </button>
-        <div
-          className={`flex items-center gap-3 rounded-2xl bg-[#13283a] p-3 ${
-            collapsed ? "justify-center" : ""
-          }`}
-        >
-          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#24384c] text-[11px] font-bold">
-            MO
-          </span>
-          {!collapsed ? (
-            <>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold leading-tight">Melanie</p>
-                <p className="truncate text-[11px] text-[#9eb0c2]">your rep · replies in ~10 min</p>
-              </div>
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#3dcb7a] text-[#0c1726]">
-                ›
-              </span>
-            </>
-          ) : null}
-        </div>
       </div>
     </>
   );
 }
 
 function Sidebar({
+  config,
   collapsed,
   mobileOpen,
   onToggleCollapsed,
   onCloseMobile,
 }: {
+  config: ShellConfig;
   collapsed: boolean;
   mobileOpen: boolean;
   onToggleCollapsed: () => void;
@@ -269,6 +214,7 @@ function Sidebar({
       >
         <Suspense fallback={<div className="flex-1 bg-[#0c1726]" />}>
           <SidebarPanel
+            config={config}
             collapsed={collapsed}
             onToggleCollapsed={onToggleCollapsed}
             onNavigate={onCloseMobile}
@@ -281,10 +227,11 @@ function Sidebar({
 
 export function Shell({
   children,
+  config,
   flush = false,
 }: {
   children: React.ReactNode;
-  /** Remove main padding (e.g. full-bleed approval flow). */
+  config: ShellConfig;
   flush?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -310,6 +257,7 @@ export function Shell({
   return (
     <div className="min-h-svh bg-[#f3f0e8] text-[#122033]">
       <Sidebar
+        config={config}
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onToggleCollapsed={toggleCollapsed}
@@ -353,6 +301,26 @@ export function Shell({
         </div>
         <div className={`min-w-0 flex-1 ${flush ? "" : "px-4 py-5 sm:px-6"}`}>{children}</div>
       </div>
+    </div>
+  );
+}
+
+export function AdminActions({show}: {show: boolean}) {
+  if (!show) return null;
+  return (
+    <div className="flex flex-wrap gap-2 sm:pt-3">
+      <button
+        type="button"
+        className="rounded-full border border-[#e4dfd6] bg-white px-4 py-2 text-sm font-semibold"
+      >
+        Share status link
+      </button>
+      <button
+        type="button"
+        className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white"
+      >
+        + New program
+      </button>
     </div>
   );
 }

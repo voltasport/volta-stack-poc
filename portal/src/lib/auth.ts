@@ -1,17 +1,14 @@
 import {Pool as NeonPool, neonConfig} from "@neondatabase/serverless";
 import {betterAuth} from "better-auth";
+import {admin} from "better-auth/plugins";
 import {Pool as PgPool} from "pg";
 import ws from "ws";
 
-// Node 20 has no global WebSocket. Vercel's Node 24 does, so this only
-// matters for local scripts and `next dev` on older Node.
 if (typeof WebSocket === "undefined") {
   neonConfig.webSocketConstructor = ws;
 }
 
 function resolveAuthSecret(): string | undefined {
-  // Dynamic key access avoids build-time inlining of undefined when the var is
-  // a Vercel Sensitive/Secret env (not present during `next build`).
   return process.env["BETTER_AUTH_SECRET"];
 }
 
@@ -50,7 +47,14 @@ function createAuth() {
     database: database(),
     emailAndPassword: {
       enabled: true,
+      disableSignUp: true,
     },
+    plugins: [
+      admin({
+        adminRoles: ["admin"],
+        defaultRole: "director",
+      }),
+    ],
     user: {
       additionalFields: {
         role: {
@@ -73,7 +77,6 @@ function createAuth() {
 
 let auth: ReturnType<typeof createAuth> | undefined;
 
-/** Better Auth instance. Portal pages require a session. The marketing site does not. */
 export function getAuth() {
   auth ??= createAuth();
   return auth;

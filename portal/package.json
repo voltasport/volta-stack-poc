@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "db:migrate": "tsx db/migrate.ts",
+    "db:seed": "tsx db/seed.ts",
+    "db:seed-users": "tsx db/seed-users.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",

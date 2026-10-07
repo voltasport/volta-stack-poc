@@ -19,7 +19,7 @@ export const entities: CatalogEntity[] = [
     slug: "davis",
     name: "Davis High School",
     short: "DA",
-    programs: false,
+    programs: true,
     match: /\bdavis\b/i,
   },
   {

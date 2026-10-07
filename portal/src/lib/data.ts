@@ -24,6 +24,7 @@ export type KitItem = {
 
 export type Program = {
   slug: string;
+  schoolSlug: string;
   name: string;
   line: string;
   meta: string;
@@ -62,6 +63,7 @@ const womensRoster: RosterRow[] = [
 export const programs: Program[] = [
   {
     slug: "cross-country",
+    schoolSlug: "slcc",
     name: "Cross Country",
     line: "Travel kits · 114 athletes",
     meta: "Production · wk 5 of 6",
@@ -111,6 +113,7 @@ export const programs: Program[] = [
   },
   {
     slug: "womens-soccer",
+    schoolSlug: "slcc",
     name: "Women’s Soccer",
     line: "Fall 2026 kits · 28 athletes",
     meta: "Design · proof v3 ready",
@@ -154,6 +157,7 @@ export const programs: Program[] = [
   },
   {
     slug: "mens-soccer",
+    schoolSlug: "slcc",
     name: "Men’s Soccer",
     line: "3 kits + apparel · 38 athletes",
     meta: "Delivered",
@@ -191,7 +195,42 @@ export const programs: Program[] = [
     files: [{name: "Packing-list.pdf", meta: "Sep 20"}],
   },
   {
+    slug: "davis-varsity",
+    schoolSlug: "davis",
+    name: "Varsity Basketball",
+    line: "Home & away kits · 15 athletes",
+    meta: "Design · initial concepts",
+    stage: "Design · initial concepts",
+    status: "On track",
+    filled: 2,
+    total: 6,
+    eyebrow: "Davis High · Varsity Basketball",
+    title: "2026 UNIFORMS",
+    deliveryLabel: "Delivers to Davis High School",
+    deliveryDate: "NOV 12",
+    phase: "DESIGN",
+    weekNote: "Concept boards due Friday. Coach review scheduled next week.",
+    weekAuthor: "Jordan · Volta · Wed",
+    shipTo: "Davis High School",
+    shipNote: "Ship to athletics office",
+    items: [{name: "Home jersey", qty: "15", proof: "v1", status: "Design"}],
+    roster: [
+      {num: "5", name: "K. Brooks", pos: "G", jersey: "M", short: "M", back: "BROOKS", submitted: true},
+    ],
+    milestones: [
+      {label: "Kickoff", date: "Oct 1", state: "done"},
+      {label: "Design", date: "Now", state: "now"},
+      {label: "Samples", date: "—", state: "next"},
+      {label: "Production", date: "—", state: "next"},
+      {label: "QC", date: "—", state: "next"},
+      {label: "Delivered", date: "~Nov 12", state: "next"},
+    ],
+    proofs: [{version: "v1", date: "Oct 5", note: "Concept boards", current: true}],
+    files: [{name: "Concept-boards.pdf", meta: "Oct 5"}],
+  },
+  {
     slug: "next-program",
+    schoolSlug: "slcc",
     name: "[Next program]",
     line: "Kickoff call booked",
     meta: "Kickoff · Oct 14",
@@ -230,18 +269,21 @@ export function getProgram(slug: string) {
 export const needsYou = [
   {
     href: "/approvals/away-kit",
+    programSlug: "womens-soccer",
     title: "Approve away kit v3",
     detail: "Women’s Soccer · 2 min",
     badge: "check" as const,
   },
   {
     href: "/programs/womens-soccer?tab=roster",
+    programSlug: "womens-soccer",
     title: "Athletes missing sizes",
     detail: "Women’s Soccer · due Oct 8",
     badge: "4" as const,
   },
   {
-    href: "/programs/cross-country?tab=files",
+    href: "/invoices",
+    programSlug: "cross-country",
     title: "Invoice ready for PO",
     detail: "Cross Country",
     badge: "doc" as const,
