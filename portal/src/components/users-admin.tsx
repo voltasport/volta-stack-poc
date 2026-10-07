@@ -36,12 +36,14 @@ export function UsersAdmin({
   assignments,
   inviteColumnsReady,
   emailConfigured,
+  currentAdminUserId,
 }: {
   users: PortalUserInviteRow[];
   programs: ProgramRow[];
   assignments: Record<string, string[]>;
   inviteColumnsReady: boolean;
   emailConfigured: boolean;
+  currentAdminUserId: string;
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string | null>(null);
@@ -238,6 +240,28 @@ export function UsersAdmin({
                   }}
                 >
                   Copy set-password link
+                </button>
+                <button
+                  type="button"
+                  className="rounded-full border border-[#e8c4c4] px-3 py-1.5 text-sm font-semibold text-[#9a3b3b]"
+                  disabled={user.id === currentAdminUserId}
+                  onClick={async () => {
+                    const ok = window.confirm(
+                      `Delete ${user.email}? This removes their account, sessions, assignments, and any programs only they own.`,
+                    );
+                    if (!ok) return;
+                    setLink(null);
+                    const response = await fetch(`/api/admin/users/${user.id}`, {method: "DELETE"});
+                    const payload = await response.json();
+                    if (!response.ok) {
+                      setMessage(payload.error ?? "Could not delete user");
+                      return;
+                    }
+                    setMessage(`Deleted ${payload.email ?? user.email}.`);
+                    router.refresh();
+                  }}
+                >
+                  Delete user
                 </button>
               </div>
             </li>

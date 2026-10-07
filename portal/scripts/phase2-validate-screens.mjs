@@ -4,6 +4,13 @@ import {mkdirSync, readFileSync, writeFileSync} from "node:fs";
 import {join} from "node:path";
 import {Pool} from "pg";
 import {LOCAL_TEST_ADMIN_EMAIL, seedPasswords} from "./require-seed-env.mjs";
+import {
+  assertLocalDatabaseUrl,
+  loginViaApi,
+  onboardBenViaAdminUi,
+  onboardingE2eCredentials,
+  purgeOnboardingUserByEmail,
+} from "./onboarding-e2e-helpers.mjs";
 
 for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8").split("\n")) {
   const m = line.match(/^([^#=]+)=(.*)$/);
@@ -14,7 +21,9 @@ const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
 const out = "/opt/cursor/artifacts";
 mkdirSync(out, {recursive: true});
 const passwords = seedPasswords();
-const BEN = {email: "ben@andcollar.com", password: "BenOnboard-Audit-12"};
+assertLocalDatabaseUrl();
+const e2eCreds = onboardingE2eCredentials();
+const BEN = {email: e2eCreds.benEmail, password: e2eCreds.benPassword};
 
 async function login(ctx, email, password) {
   const res = await ctx.request.post(`${base}/api/auth/sign-in/email`, {data: {email, password}});
@@ -33,22 +42,16 @@ execSync("npm run db:seed-users", {
   stdio: "inherit",
 });
 
-const pool = new Pool({connectionString: process.env.DATABASE_URL});
-await pool.query(`update "user" set onboarding_dismissed_at = null where email = $1`, [BEN.email]);
-await pool.query(
-  `delete from user_program_assignments where user_id = (select id from "user" where email = $1)`,
-  [BEN.email],
-);
-await pool.end();
+await purgeOnboardingUserByEmail(BEN.email);
 
 const browser = await chromium.launch();
-const benCtx = await browser.newContext();
-const benPage = await benCtx.newPage();
-await login(benCtx, BEN.email, BEN.password);
-
 const adminCtx = await browser.newContext();
 const adminPage = await adminCtx.newPage();
 await login(adminCtx, LOCAL_TEST_ADMIN_EMAIL, passwords.admin);
+
+const benCtx = await browser.newContext();
+const benPage = await benCtx.newPage();
+await onboardBenViaAdminUi(adminPage, adminCtx, benPage, base, e2eCreds);
 
 const usersStatus = await adminCtx.request.get(`${base}/users`);
 if (usersStatus.status() !== 200) {

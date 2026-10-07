@@ -30,6 +30,7 @@ export default async function UsersPage() {
         assignments={assignments}
         inviteColumnsReady={inviteColumnsReady}
         emailConfigured={isInviteEmailConfigured()}
+        currentAdminUserId={access.userId}
       />
     </Shell>
   );

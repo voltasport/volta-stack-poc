@@ -60,4 +60,7 @@ Local `db:seed-users` creates **`admin@test.local`**. Set **`SEED_ADMIN_PASSWORD
 npm run db:seed && npm run db:migrate && npm run db:seed-users
 npm run build && npm run start -- -p 3001
 node scripts/phase2-validate-screens.mjs
+node scripts/onboarding-e2e.mjs
 ```
+
+Standing rule: onboarding validation starts clean — `onboarding-e2e.mjs` purges the E2E Ben user (and sole-owned programs/rosters), re-adds via admin **Users** UI, then runs invite → set password → checklist → program → roster. Requires `ONBOARDING_E2E_*` in `.env.local` (see `.env.example`). **Local DB only.**
