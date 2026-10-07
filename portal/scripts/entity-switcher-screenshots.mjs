@@ -1,10 +1,17 @@
 import {chromium} from "playwright";
 import {mkdirSync, writeFileSync} from "node:fs";
+import {
+  LOCAL_TEST_ADMIN_EMAIL,
+  LOCAL_TEST_DIRECTOR_EMAIL,
+  LOCAL_TEST_MANAGER_EMAIL,
+  seedPasswords,
+} from "./require-seed-env.mjs";
 
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
 const out = "/opt/cursor/artifacts";
 mkdirSync(out, {recursive: true});
 
+const passwords = seedPasswords();
 const report = {roles: []};
 
 async function login(context, email, password) {
@@ -38,25 +45,19 @@ async function captureRole(browser, role, email, password, filePrefix) {
 
 const browser = await chromium.launch();
 
-await captureRole(
-  browser,
-  "admin",
-  "admin@voltasport.co",
-  "VoltaAdmin123!",
-  "entity-switcher-admin",
-);
+await captureRole(browser, "admin", LOCAL_TEST_ADMIN_EMAIL, passwords.admin, "entity-switcher-admin");
 await captureRole(
   browser,
   "director",
-  "director@test.local",
-  "director-test-12",
+  LOCAL_TEST_DIRECTOR_EMAIL,
+  passwords.director,
   "entity-switcher-director",
 );
 await captureRole(
   browser,
   "manager",
-  "manager@test.local",
-  "manager-test-12",
+  LOCAL_TEST_MANAGER_EMAIL,
+  passwords.manager,
   "entity-switcher-manager",
 );
 

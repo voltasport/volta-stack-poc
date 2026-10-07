@@ -1,5 +1,13 @@
 import {chromium} from "playwright";
 import {mkdirSync, writeFileSync} from "node:fs";
+import {
+  LOCAL_TEST_ADMIN_EMAIL,
+  LOCAL_TEST_DIRECTOR_EMAIL,
+  LOCAL_TEST_MANAGER_EMAIL,
+  inviteTestPassword,
+  randomProbePassword,
+  seedPasswords,
+} from "./require-seed-env.mjs";
 
 /** Use the same origin as `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` on the prod server. */
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
@@ -36,6 +44,7 @@ async function shot(page, file) {
   report.screenshots.push(file);
 }
 
+const passwords = seedPasswords();
 const browser = await chromium.launch();
 
 const signUpRes = await fetch(`${base}/api/auth/sign-up/email`, {
@@ -43,7 +52,7 @@ const signUpRes = await fetch(`${base}/api/auth/sign-up/email`, {
   headers: {"Content-Type": "application/json"},
   body: JSON.stringify({
     email: "blocked-signup@test.local",
-    password: "blocked-test-12",
+    password: randomProbePassword(),
     name: "Blocked",
   }),
 });
@@ -52,7 +61,7 @@ else pass("sign-up-rejected", `HTTP ${signUpRes.status}`);
 
 const adminCtx = await browser.newContext();
 const adminPage = await adminCtx.newPage();
-await login(adminCtx, adminPage, "admin@voltasport.co", "VoltaAdmin123!");
+await login(adminCtx, adminPage, LOCAL_TEST_ADMIN_EMAIL, passwords.admin);
 await adminPage.waitForSelector("h1:has-text('MORNING')", {timeout: 20000});
 await adminPage.setViewportSize({width: 1440, height: 900});
 await shot(adminPage, "role-admin-overview-desktop");
@@ -73,7 +82,7 @@ await shot(adminPage, "role-admin-users-mobile");
 pass("admin-screenshots", "overview, programs, users captured");
 
 const inviteEmail = `invited-${Date.now()}@test.local`;
-const invitePassword = "InvitedUser123!";
+const invitePassword = inviteTestPassword();
 const createRes = await adminCtx.request.post(`${base}/api/admin/users`, {
   data: {email: inviteEmail, name: "Invited Manager", role: "manager"},
 });
@@ -117,7 +126,7 @@ pass("invite-flow", "set password, login, single program, 404 on other");
 
 const directorCtx = await browser.newContext();
 const directorPage = await directorCtx.newPage();
-await login(directorCtx, directorPage, "director@test.local", "director-test-12");
+await login(directorCtx, directorPage, LOCAL_TEST_DIRECTOR_EMAIL, passwords.director);
 await directorPage.waitForSelector("h1:has-text('MORNING')", {timeout: 20000});
 await directorPage.setViewportSize({width: 1440, height: 900});
 await shot(directorPage, "role-director-overview-desktop");
@@ -135,7 +144,7 @@ await shot(directorPage, "role-director-programs-mobile");
 
 const managerCtx = await browser.newContext();
 const managerPage = await managerCtx.newPage();
-await login(managerCtx, managerPage, "manager@test.local", "manager-test-12");
+await login(managerCtx, managerPage, LOCAL_TEST_MANAGER_EMAIL, passwords.manager);
 await managerPage.waitForSelector("h1:has-text('MORNING')", {timeout: 20000});
 await managerPage.setViewportSize({width: 1440, height: 900});
 await shot(managerPage, "role-manager-overview-desktop");

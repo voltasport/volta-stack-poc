@@ -34,13 +34,16 @@ cd portal
 export DATABASE_URL='…'   # never commit
 npm run db:migrate        # production: once per release with new SQL
 npm run db:seed           # local/demo only — truncates program data, applies schema.sql
-npm run db:seed-users     # local/dev only — test users; set SEED_* passwords via env
+npm run db:seed-users     # local Postgres only; requires SEED_* env (see .env.example)
 ```
+
+Local `db:seed-users` creates **`admin@test.local`** (not `admin@voltasport.co`). Set **`SEED_ADMIN_PASSWORD`**, **`SEED_DIRECTOR_PASSWORD`**, and **`SEED_MANAGER_PASSWORD`** in `portal/.env.local` (gitignored). Scripts fail with a clear error if any are missing.
 
 ### Fresh local validation DB
 
 ```bash
 npm run db:seed && npm run db:migrate && npm run db:seed-users
 npm run build && npm run start -- -p 3001
-node scripts/validate-roles-prod.mjs
+# export SEED_* from .env.local, then:
+PORTAL_BASE_URL=http://localhost:3001 node scripts/validate-roles-prod.mjs
 ```
