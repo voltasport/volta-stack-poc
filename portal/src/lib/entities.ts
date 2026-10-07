@@ -61,6 +61,11 @@ export const allSchools: CatalogEntity = {
   match: null,
 };
 
+/** Schools/orgs in the sidebar picker — not “All schools”, not the catalog-only “other” bucket. */
+export function sidebarSchoolEntities(): CatalogEntity[] {
+  return entities.filter((entity) => entity.slug !== "other");
+}
+
 export function entityBySlug(slug: string | undefined) {
   if (slug === allSchools.slug) return allSchools;
   return entities.find((entity) => entity.slug === slug) ?? entities[0];

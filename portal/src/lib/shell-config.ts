@@ -35,9 +35,16 @@ export function createShellConfig(
     item.match === "roster" ? {...item, href: rosterHref} : item,
   );
 
-  const entityChoices = (access.canSeeAllSchools ? [allSchools, ...access.entities] : access.entities).map(
-    toShellEntity,
-  );
+  const entityChoices: ShellEntity[] = [];
+  const seen = new Set<string>();
+  const push = (entity: CatalogEntity) => {
+    if (seen.has(entity.slug)) return;
+    seen.add(entity.slug);
+    entityChoices.push(toShellEntity(entity));
+  };
+  if (access.canSeeAllSchools) push(allSchools);
+  for (const entity of access.entities) push(entity);
+
 
   return {
     nav,
