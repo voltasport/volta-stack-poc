@@ -1,22 +1,27 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
+import {buildRosterCsvTemplate, canViewProgram, loadSizedItems} from "@/lib/program-kit-items";
 import {assertCanEditProgramRoster, importRosterCsvRows} from "@/lib/portal-programs";
 import {
   MAX_ROSTER_CSV_CHARS,
-  previewRosterCsv,
-  ROSTER_CSV_TEMPLATE,
+  previewRosterCsvForItems,
   ROSTER_CSV_TOO_LARGE,
   rosterCsvSizeError,
 } from "@/lib/roster-csv";
 
-/** Raw request cap (CSV text plus JSON/multipart overhead). */
 const MAX_REQUEST_BYTES = MAX_ROSTER_CSV_CHARS * 2;
 
-export async function GET() {
-  return new NextResponse(ROSTER_CSV_TEMPLATE, {
+export async function GET(_request: Request, {params}: {params: Promise<{slug: string}>}) {
+  const access = await getAccessContext();
+  if (!access) return NextResponse.json({error: "Unauthorized"}, {status: 401});
+  const {slug} = await params;
+  if (!canViewProgram(access, slug)) return NextResponse.json({error: "Forbidden"}, {status: 403});
+  const template = buildRosterCsvTemplate(await loadSizedItems(slug));
+  const safeName = slug.replace(/[^a-z0-9-]/gi, "").slice(0, 60) || "program";
+  return new NextResponse(template, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="roster-template.csv"',
+      "Content-Disposition": `attachment; filename="${safeName}-roster-template.csv"`,
     },
   });
 }
@@ -38,6 +43,13 @@ export async function POST(
     if (declaredLength > MAX_REQUEST_BYTES) {
       return NextResponse.json({error: ROSTER_CSV_TOO_LARGE}, {status: 413});
     }
+
+    const sizedItems = await loadSizedItems(slug);
+    const itemsForCsv = sizedItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      sizeOptions: item.sizeOptions,
+    }));
 
     const contentType = request.headers.get("content-type") ?? "";
     let text = "";
@@ -77,7 +89,7 @@ export async function POST(
       return NextResponse.json({error: sizeError}, {status: 413});
     }
 
-    const preview = previewRosterCsv(text);
+    const preview = previewRosterCsvForItems(text, itemsForCsv);
     if (action === "preview") {
       return NextResponse.json(preview);
     }

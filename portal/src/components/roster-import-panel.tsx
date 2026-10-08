@@ -1,22 +1,24 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {useRef, useState} from "react";
-import {ROSTER_CSV_TEMPLATE} from "@/lib/roster-csv-template";
+import {useEffect, useRef, useState} from "react";
 
 type PreviewRow = {
   rowIndex: number;
   num: string;
   name: string;
-  jersey: string;
-  short: string;
   back: string;
+  sizes: Record<number, string>;
+  invalidSizes?: Record<number, string>;
   errors: string[];
   ok: boolean;
   submitted: boolean;
 };
 
 type PreviewResponse = {
+  /** Sized item columns for this program, from the server (source of truth). */
+  items: {id: number; name: string}[];
+  unmatchedColumns?: string[];
   rows: PreviewRow[];
   validCount: number;
   invalidCount: number;
@@ -36,21 +38,28 @@ export function RosterImportPanel({
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
   const [mode, setMode] = useState<"append" | "replace">("append");
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  function downloadTemplate() {
-    const blob = new Blob([ROSTER_CSV_TEMPLATE], {type: "text/csv;charset=utf-8"});
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = "roster-template.csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
-  }
+  const [template, setTemplate] = useState("");
+
+  // The per-program template is shown as placeholder text only, so sample rows are never saved by accident.
+  useEffect(() => {
+    let cancelled = false;
+    void fetch(`/api/programs/${programSlug}/roster/import`)
+      .then((res) => (res.ok ? res.text() : ""))
+      .then((body) => {
+        if (!cancelled) setTemplate(body.trim());
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [programSlug]);
 
   async function runPreview(nextText?: string) {
     setPending(true);
@@ -99,53 +108,66 @@ export function RosterImportPanel({
 
   async function onFileChange(file: File | null) {
     if (!file) return;
+    setFileName(file.name);
     const contents = await file.text();
     setText(contents);
     await runPreview(contents);
   }
 
+  const itemColumns = preview?.items ?? [];
+
   return (
-    <div className={`flex flex-col gap-3 ${compact ? "" : "rounded-2xl bg-[#f7f4ee] p-4"}`}>
+    <div className={`flex min-w-0 flex-col gap-3 ${compact ? "" : "rounded-2xl bg-[#f7f4ee] p-4"}`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">IMPORT ROSTER</p>
-        <button
-          type="button"
-          onClick={downloadTemplate}
+        {/* Same-origin GET; the route builds the per-program template and sends it as an attachment. */}
+        <a
+          href={`/api/programs/${programSlug}/roster/import`}
+          download
           className="text-xs font-semibold text-[#1f8a4d] underline-offset-2 hover:underline"
         >
           Download CSV template
-        </button>
+        </a>
       </div>
       <p className="text-sm text-[#3c4a5c]">
-        Upload or paste CSV with name, number, and size columns. Position is optional if included.
+        Upload or paste CSV with name, number, back name, and one column per sized item. Position is
+        ignored if present.
       </p>
-      <input
-        ref={fileRef}
-        type="file"
-        accept=".csv,text/csv,text/plain"
-        className="text-sm"
-        onChange={(event) => void onFileChange(event.target.files?.[0] ?? null)}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv,text/plain"
+          className="sr-only"
+          onChange={(event) => void onFileChange(event.target.files?.[0] ?? null)}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="rounded-full border border-[#d8d2c8] bg-white px-4 py-2 text-sm font-semibold"
+        >
+          Choose CSV file
+        </button>
+        {fileName ? <span className="text-sm text-[#6d7b8a]">{fileName}</span> : null}
+      </div>
       <textarea
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={compact ? 6 : 5}
-        placeholder={ROSTER_CSV_TEMPLATE}
         aria-label="Roster CSV"
+        placeholder={template}
         className="w-full rounded-xl border px-3 py-2 text-sm font-normal"
         spellCheck={false}
       />
       <div className="flex flex-wrap items-center gap-2">
-        <label className="flex items-center gap-2 text-sm">
-          <select
-            value={mode}
-            onChange={(event) => setMode(event.target.value as "append" | "replace")}
-            className="rounded-lg border px-2 py-1 text-sm"
-          >
-            <option value="append">Append to roster</option>
-            <option value="replace">Replace entire roster</option>
-          </select>
-        </label>
+        <select
+          value={mode}
+          onChange={(event) => setMode(event.target.value as "append" | "replace")}
+          className="rounded-lg border px-2 py-1 text-sm"
+        >
+          <option value="append">Append to roster</option>
+          <option value="replace">Replace entire roster</option>
+        </select>
         <button
           type="button"
           disabled={pending || !text.trim()}
@@ -165,29 +187,42 @@ export function RosterImportPanel({
       </div>
 
       {preview && preview.rows.length > 0 ? (
-        <div className="table-scroll -mx-1 overflow-x-auto">
-          <table className="w-full min-w-[520px] text-left text-sm">
+        <div className="table-scroll w-full overflow-x-auto rounded-xl border border-[#e8e2d8] bg-white">
+          <table className="w-full text-left text-sm" style={{minWidth: 600 + itemColumns.length * 72}}>
             <thead className="text-xs text-[#7b8794]">
               <tr>
-                <th className="pb-2 pr-2 font-medium">Row</th>
-                <th className="pb-2 pr-2 font-medium">#</th>
-                <th className="pb-2 pr-2 font-medium">Name</th>
-                <th className="pb-2 pr-2 font-medium">Jersey</th>
-                <th className="pb-2 pr-2 font-medium">Short</th>
-                <th className="pb-2 pr-2 font-medium">Back</th>
-                <th className="pb-2 font-medium">Status</th>
+                <th className="px-3 pb-2 font-medium">Row</th>
+                <th className="px-3 pb-2 font-medium">#</th>
+                <th className="px-3 pb-2 font-medium">Name</th>
+                <th className="px-3 pb-2 font-medium">Back</th>
+                {itemColumns.map((item) => (
+                  <th key={item.id} className="px-3 pb-2 font-medium whitespace-nowrap">
+                    {item.name}
+                  </th>
+                ))}
+                <th className="px-3 pb-2 font-medium">Status</th>
               </tr>
             </thead>
             <tbody>
               {preview.rows.map((row) => (
                 <tr key={row.rowIndex} className="border-t border-[#e8e2d8]">
-                  <td className="py-2 pr-2 text-xs text-[#7b8794]">{row.rowIndex}</td>
-                  <td className="py-2 pr-2">{row.num || "—"}</td>
-                  <td className="py-2 pr-2">{row.name || "—"}</td>
-                  <td className="py-2 pr-2">{row.jersey}</td>
-                  <td className="py-2 pr-2">{row.short}</td>
-                  <td className="py-2 pr-2">{row.back}</td>
-                  <td className="py-2">
+                  <td className="px-3 py-2 text-xs text-[#7b8794]">{row.rowIndex}</td>
+                  <td className="px-3 py-2">{row.num || "—"}</td>
+                  <td className="px-3 py-2">{row.name || "—"}</td>
+                  <td className="px-3 py-2">{row.back}</td>
+                  {itemColumns.map((item) => (
+                    <td key={item.id} className="px-3 py-2 whitespace-nowrap">
+                      {row.sizes[item.id] ??
+                        (row.invalidSizes?.[item.id] ? (
+                          <span className="rounded bg-[#fbe9e9] px-1 font-semibold text-[#9a3b3b]">
+                            {row.invalidSizes[item.id]}
+                          </span>
+                        ) : (
+                          "—"
+                        ))}
+                    </td>
+                  ))}
+                  <td className="px-3 py-2">
                     {row.ok ? (
                       <span
                         className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
@@ -199,14 +234,22 @@ export function RosterImportPanel({
                         {row.submitted ? "Sizes complete" : "Missing sizes"}
                       </span>
                     ) : (
-                      <span className="text-xs font-semibold text-[#9a3b3b]">{row.errors.join(" ")}</span>
+                      <span className="block w-72 whitespace-normal text-xs font-semibold leading-5 text-[#9a3b3b]">
+                        {row.errors.join(" ")}
+                      </span>
                     )}
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-          <p className="mt-2 text-xs text-[#6d7b8a]">
+          {preview.unmatchedColumns && preview.unmatchedColumns.length > 0 ? (
+            <p className="px-3 pt-2 text-xs font-semibold text-[#8a6914]">
+              Ignored columns (not an item on this program): {preview.unmatchedColumns.join(", ")}. Add
+              them on the Items tab to import those sizes.
+            </p>
+          ) : null}
+          <p className="px-3 py-2 text-xs text-[#6d7b8a]">
             {preview.validCount} ready to save
             {preview.invalidCount > 0 ? ` · ${preview.invalidCount} with errors (skipped on save)` : ""}
           </p>

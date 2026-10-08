@@ -2,6 +2,7 @@ import {notFound} from "next/navigation";
 import {ProgramDetail} from "@/components/program-detail";
 import {Shell} from "@/components/shell";
 import {assertProgramAccess, requireAccess, resolveCurrentEntity} from "@/lib/access";
+import {canEditProgramKitItems} from "@/lib/program-kit-items";
 import {createShellConfig} from "@/lib/shell-config";
 import {getShellMetrics} from "@/lib/shell-metrics";
 import {getProgram} from "@/lib/queries";
@@ -29,14 +30,17 @@ export default async function ProgramPage({
   const canEditRoster =
     access.role === "admin" ||
     (access.programSlugs !== null && access.programSlugs.includes(slug));
+  const canEditItems = canEditProgramKitItems(access, slug);
 
   return (
     <Shell config={shellConfig}>
       <ProgramDetail
         program={program}
-        initialTab={tab}
+        initialTab={tab === "sized-items" ? "items" : tab}
         showAdminActions={access.showAdminActions}
         canEditRoster={canEditRoster}
+        canEditItems={canEditItems}
+        isAdmin={access.role === "admin"}
       />
     </Shell>
   );

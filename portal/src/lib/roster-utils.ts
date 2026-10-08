@@ -12,3 +12,18 @@ export function rosterRowSubmitted(jersey: string, short: string, back: string) 
   };
   return filled(jersey) && filled(short) && filled(back);
 }
+
+/** Match a raw size against an item's options (case-insensitive); returns the canonical option or null. */
+export function normalizeSizeValue(raw: string, options: readonly string[]) {
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === "—") return null;
+  return options.find((option) => option.toLowerCase() === trimmed.toLowerCase()) ?? null;
+}
+
+/** True when every sized item has a valid size for this row (no sized items means complete). */
+export function rowSizesComplete(
+  items: {id: number; sizeOptions: readonly string[]}[],
+  values: Record<number, string>,
+) {
+  return items.every((item) => normalizeSizeValue(values[item.id] ?? "", item.sizeOptions) !== null);
+}

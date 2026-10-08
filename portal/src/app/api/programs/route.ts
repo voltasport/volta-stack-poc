@@ -15,6 +15,7 @@ export async function POST(request: Request) {
       season?: string;
       rosterSize?: number | string;
       organizationName?: string;
+      sizedItemsPresetId?: string;
     };
     const levelOrSeason = String(body.levelOrSeason ?? body.level ?? body.season ?? "").trim();
     const rosterRaw = body.rosterSize;
@@ -32,6 +33,7 @@ export async function POST(request: Request) {
       levelOrSeason,
       rosterSize: Number.isFinite(rosterSize) ? rosterSize : null,
       organizationName: orgName,
+      sizedItemsPresetId: body.sizedItemsPresetId ? String(body.sizedItemsPresetId) : undefined,
     });
     if (!result.ok) {
       return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});

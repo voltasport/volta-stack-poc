@@ -5,6 +5,7 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useState} from "react";
 import type {Program, TabId} from "@/lib/data";
 import {RosterImportPanel} from "@/components/roster-import-panel";
+import {KitItemsPanel} from "@/components/kit-items-panel";
 const tabs: {id: TabId; label: string}[] = [
   {id: "items", label: "Items"},
   {id: "roster", label: "Roster"},
@@ -17,11 +18,15 @@ export function ProgramDetail({
   initialTab = "items",
   showAdminActions = false,
   canEditRoster = false,
+  canEditItems = false,
+  isAdmin = false,
 }: {
   program: Program;
   initialTab?: string;
   showAdminActions?: boolean;
   canEditRoster?: boolean;
+  canEditItems?: boolean;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -113,17 +118,33 @@ export function ProgramDetail({
         ))}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.6fr)_280px]">
+      <div
+        className={`mt-4 grid grid-cols-1 gap-4 ${
+          tab === "roster"
+            ? ""
+            : "xl:grid-cols-[minmax(0,1.6fr)_280px]"
+        }`}
+      >
         <section className="min-w-0 rounded-3xl bg-white p-5">
-          {tab === "items" ? <Items program={program} /> : null}
+          {tab === "items" ? (
+            <KitItemsPanel
+              programSlug={program.slug}
+              items={program.items}
+              canEdit={canEditItems && program.sizesReady !== false}
+              isAdmin={isAdmin}
+            />
+          ) : null}
           {tab === "roster" ? <Roster program={program} canEdit={canEditRoster} /> : null}
           {tab === "proofs" ? <Proofs program={program} /> : null}
           {tab === "files" ? <Files program={program} /> : null}
         </section>
+        {tab === "roster" ? null : (
         <div className="flex flex-col gap-4">
           <section className="rounded-3xl bg-white p-5">
             <h2 className="text-sm font-extrabold tracking-[0.08em]">THIS WEEK</h2>
-            <p className="mt-3 text-sm leading-6 text-[#3c4a5c]">{program.weekNote}</p>
+            <p className="mt-3 text-sm leading-6 text-[#3c4a5c]">
+              {program.displayWeekNote ?? program.weekNote}
+            </p>
             <p className="mt-4 text-xs text-[#6d7b8a]">{program.weekAuthor}</p>
           </section>
           <section className="rounded-3xl bg-white p-5">
@@ -131,6 +152,7 @@ export function ProgramDetail({
             <ShipTo program={program} />
           </section>
         </div>
+        )}
       </div>
     </div>
   );
@@ -158,56 +180,16 @@ function ShipTo({program}: {program: Program}) {
   );
 }
 
-function Items({program}: {program: Program}) {
-  if (program.items.length === 0) {
-    return <p className="text-sm text-[#6d7b8a]">No items until kickoff.</p>;
-  }
-  return (
-    <div>
-      <h2 className="text-sm font-extrabold tracking-[0.08em]">ITEMS</h2>
-      <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
-      <table className="w-full min-w-[520px] text-left text-sm">
-        <thead className="text-xs text-[#7b8794]">
-          <tr>
-            <th className="pb-2 font-medium">Item</th>
-            <th className="pb-2 font-medium">Qty</th>
-            <th className="pb-2 font-medium">Proof</th>
-            <th className="pb-2 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {program.items.map((item) => (
-            <tr key={item.name} className="border-t border-[#f0ece4]">
-              <td className="py-3">
-                <span className="mr-3 inline-grid h-8 w-8 place-items-center rounded-lg bg-[#f3f0e8] text-[10px] text-[#7b8794]">
-                  IMG
-                </span>
-                {item.name}
-              </td>
-              <td>{item.qty}</td>
-              <td className="font-semibold text-[#1f8a4d]">
-                {item.proof} ✓
-              </td>
-              <td>{item.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </div>
-  );
-}
-
 function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
   const router = useRouter();
+  const sizedItems = program.sizedItems ?? [];
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [num, setNum] = useState("");
   const [name, setName] = useState("");
-  const [jersey, setJersey] = useState("");
-  const [short, setShort] = useState("");
   const [back, setBack] = useState("");
+  const [sizes, setSizes] = useState<Record<number, string>>({});
 
   async function addPlayer() {
     setPending(true);
@@ -215,7 +197,7 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
     const res = await fetch(`/api/programs/${program.slug}/roster`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({num, name, jersey, short, back}),
+      body: JSON.stringify({num, name, back, sizes}),
     });
     setPending(false);
     if (!res.ok) {
@@ -225,14 +207,14 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
     }
     setNum("");
     setName("");
-    setJersey("");
-    setShort("");
     setBack("");
+    setSizes({});
     setMessage("Player added.");
     router.refresh();
   }
 
   const missing = program.roster.filter((row) => !row.submitted).length;
+  const minTableWidth = 520 + sizedItems.length * 96;
   if (program.roster.length === 0 && !canEdit) {
     return <p className="text-sm text-[#6d7b8a]">Roster opens after kickoff.</p>;
   }
@@ -241,15 +223,17 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
       <h2 className="text-sm font-extrabold tracking-[0.08em]">ROSTER & SIZES</h2>
       <p className="mt-2 text-sm text-[#6d7b8a]">
         {canEdit
-          ? "Add players manually or paste CSV. Sizing links can fill jersey sizes later."
-          : `Players fill these in from the sizing link. ${missing} still missing.`}
+          ? "Import a CSV or add players one at a time. Size columns come from the sized items on the Items tab."
+          : missing > 0
+            ? `${missing} athlete${missing === 1 ? "" : "s"} still missing sizes.`
+            : "All sizes are in."}
       </p>
       {canEdit ? (
         <div className="mt-4 flex flex-col gap-4">
           <RosterImportPanel programSlug={program.slug} />
           <div className="rounded-2xl bg-[#f7f4ee] p-4">
             <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">ADD ONE PLAYER</p>
-            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
               <input
                 value={num}
                 onChange={(e) => setNum(e.target.value)}
@@ -260,19 +244,7 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Name"
-                className="rounded-xl border px-3 py-2 text-sm sm:col-span-2"
-              />
-              <input
-                value={jersey}
-                onChange={(e) => setJersey(e.target.value)}
-                placeholder="Jersey size"
-                className="rounded-xl border px-3 py-2 text-sm"
-              />
-              <input
-                value={short}
-                onChange={(e) => setShort(e.target.value)}
-                placeholder="Short size"
-                className="rounded-xl border px-3 py-2 text-sm"
+                className="rounded-xl border px-3 py-2 text-sm lg:col-span-2"
               />
               <input
                 value={back}
@@ -280,11 +252,30 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
                 placeholder="Back name"
                 className="rounded-xl border px-3 py-2 text-sm"
               />
+              {sizedItems.map((item) => (
+                <label key={item.id} className="text-xs font-semibold text-[#6d7b8a]">
+                  {item.name}
+                  <select
+                    value={sizes[item.id] ?? ""}
+                    onChange={(event) =>
+                      setSizes((current) => ({...current, [item.id]: event.target.value}))
+                    }
+                    className="mt-1 w-full rounded-xl border px-3 py-2 text-sm font-normal text-[#122033]"
+                  >
+                    <option value="">—</option>
+                    {item.sizeOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
               <button
                 type="button"
                 disabled={pending}
                 onClick={() => void addPlayer()}
-                className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-3"
+                className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 lg:col-span-4"
               >
                 Add player
               </button>
@@ -297,33 +288,39 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
       {program.roster.length === 0 ? (
         <p className="mt-4 text-sm text-[#6d7b8a]">No players yet.</p>
       ) : null}
-      <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
-      <table className="w-full min-w-[640px] text-left text-sm">
+      <div className="table-scroll mt-3 w-full overflow-x-auto">
+      <table className="w-full text-left text-sm" style={{minWidth: minTableWidth}}>
         <thead className="text-xs text-[#7b8794]">
           <tr>
-            <th className="pb-2 font-medium">#</th>
-            <th className="pb-2 font-medium">Athlete</th>
-            <th className="pb-2 font-medium">Jersey</th>
-            <th className="pb-2 font-medium">Short</th>
-            <th className="pb-2 font-medium">Back</th>
-            <th className="pb-2 font-medium">Status</th>
+            <th className="px-2 pb-2 font-medium">#</th>
+            <th className="px-2 pb-2 font-medium">Athlete</th>
+            <th className="px-2 pb-2 font-medium">Back</th>
+            {sizedItems.map((item) => (
+              <th key={item.id} className="px-2 pb-2 font-medium whitespace-nowrap">
+                {item.name}
+              </th>
+            ))}
+            <th className="px-2 pb-2 font-medium">Status</th>
           </tr>
         </thead>
         <tbody>
           {program.roster.map((row, index) => (
             <tr key={row.id ?? `${row.num}-${index}`} className="border-t border-[#f0ece4]">
-              <td className="py-2.5">{row.num}</td>
-              <td>{row.name}</td>
-              <td>{row.jersey}</td>
-              <td>{row.short}</td>
-              <td className="font-semibold tracking-wide">{row.back}</td>
-              <td>
+              <td className="px-2 py-2.5">{row.num}</td>
+              <td className="px-2 whitespace-nowrap">{row.name}</td>
+              <td className="px-2 font-semibold tracking-wide whitespace-nowrap">{row.back}</td>
+              {sizedItems.map((item) => (
+                <td key={item.id} className="px-2 whitespace-nowrap">
+                  {row.sizesByItemId?.[item.id] ?? "—"}
+                </td>
+              ))}
+              <td className="px-2">
                 <span
-                  className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                  className={`rounded-full px-2 py-1 text-xs font-semibold whitespace-nowrap ${
                     row.submitted ? "bg-[#e5f6ea] text-[#187243]" : "bg-[#f8efd0] text-[#8a6914]"
                   }`}
                 >
-                  {row.submitted ? "Submitted" : "Missing"}
+                  {row.submitted ? "Sizes complete" : "Missing sizes"}
                 </span>
               </td>
             </tr>

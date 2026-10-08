@@ -28,6 +28,7 @@ export function NewProgramButton({
         levelOrSeason: data.get("levelOrSeason"),
         rosterSize: data.get("rosterSize"),
         organizationName: data.get("organizationName"),
+        sizedItemsPresetId: data.get("sizedItemsPresetId"),
       }),
     });
     setPending(false);
@@ -65,7 +66,7 @@ export function NewProgramButton({
               }}
             >
               <label className="text-sm font-semibold">
-                Organization or school name
+                Organization or school name <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="organizationName"
                   required
@@ -75,7 +76,7 @@ export function NewProgramButton({
                 />
               </label>
               <label className="text-sm font-semibold">
-                Program name
+                Program name <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="name"
                   required
@@ -100,6 +101,20 @@ export function NewProgramButton({
                   className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
                   placeholder="Varsity · Fall 2026"
                 />
+              </label>
+              <label className="text-sm font-semibold">
+                Starting kit
+                <select
+                  name="sizedItemsPresetId"
+                  defaultValue="default-kit"
+                  className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
+                >
+                  <option value="default-kit">Jersey + Short (sized)</option>
+                  <option value="none">Start empty, add items later</option>
+                </select>
+                <span className="mt-1 block text-xs font-normal text-[#6d7b8a]">
+                  You can add items like hoodies, hats, or bags on the program&apos;s Items tab.
+                </span>
               </label>
               <label className="text-sm font-semibold">
                 Expected roster size (optional)

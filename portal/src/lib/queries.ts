@@ -1,6 +1,7 @@
 import type {Program, Status} from "@/lib/data";
 import type {AccessContext} from "@/lib/access";
 import {programFilterClause} from "@/lib/access";
+import {buildMissingSizesTasks, enrichProgram, enrichPrograms} from "@/lib/program-enrichment";
 import {sql} from "@/lib/db";
 import {isMissingColumn} from "@/lib/db-errors";
 
@@ -86,10 +87,12 @@ const programQuery = `
   from programs p
   left join lateral (
     select json_agg(json_build_object(
-      'name', name, 'qty', qty, 'proof', proof, 'status', status
-    ) order by sort_order) as items
-    from kit_items
-    where program_slug = p.slug
+      'id', k.id, 'name', k.name, 'qty', k.qty, 'proof', k.proof, 'status', k.status,
+      -- to_jsonb keeps this query valid before migration 004 adds size_options.
+      'sizeOptions', coalesce(to_jsonb(k) -> 'size_options', '[]'::jsonb)
+    ) order by k.sort_order, k.id) as items
+    from kit_items k
+    where k.program_slug = p.slug
   ) items on true
   left join lateral (
     select json_agg(json_build_object(
@@ -150,7 +153,7 @@ export async function getPrograms(access: AccessContext, schoolSlug?: string) {
     params.push(schoolSlug);
   }
   const rows = await fetchProgramRows(programQuery + clause + " order by p.sort_order", params);
-  return rows.map(toProgram);
+  return enrichPrograms(rows.map(toProgram));
 }
 
 export async function getProgram(access: AccessContext, slug: string) {
@@ -160,7 +163,7 @@ export async function getProgram(access: AccessContext, slug: string) {
     ...filter.params,
   ]);
   const row = rows[0];
-  return row ? toProgram(row) : undefined;
+  return row ? enrichProgram(toProgram(row)) : undefined;
 }
 
 export async function getProgramSlugs(access: AccessContext): Promise<string[]> {
@@ -187,13 +190,18 @@ export async function getTasks(access: AccessContext) {
            order by sort_order`,
           [access.programSlugs],
         );
-    return rows as {
+    const staticTasks = rows as {
       href: string;
       title: string;
       detail: string;
       badge: "check" | "4" | "doc";
       program_slug: string | null;
     }[];
+    const dynamicMissing = await buildMissingSizesTasks(access);
+    const filteredStatic = staticTasks.filter(
+      (task) => !/missing sizes/i.test(task.title),
+    );
+    return [...dynamicMissing, ...filteredStatic];
   } catch (error) {
     if (isMissingColumn(error, "program_slug")) {
       if (!access.canSeeAllSchools) return [];
