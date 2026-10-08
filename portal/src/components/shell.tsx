@@ -271,7 +271,7 @@ function Sidebar({
       </aside>
       <aside
         style={{width: desktopWidth}}
-        className="sticky top-0 hidden h-svh shrink-0 flex-col overflow-hidden bg-[#0c1726] text-white transition-[width] duration-200 ease-out md:flex"
+        className="sticky top-0 hidden min-h-svh shrink-0 self-stretch flex-col overflow-hidden bg-[#0c1726] text-white transition-[width] duration-200 ease-out md:flex"
       >
         <SidebarPanel
           config={config}

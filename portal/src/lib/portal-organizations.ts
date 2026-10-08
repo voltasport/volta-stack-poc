@@ -82,9 +82,4 @@ export async function loadOrganizationEntities(slugs: string[]): Promise<Catalog
   }));
 }
 
-export function rosterBackName(displayName: string) {
-  const parts = displayName.trim().split(/\s+/).filter(Boolean);
-  const last = parts[parts.length - 1] ?? displayName;
-  const back = last.toUpperCase().replace(/[^A-Z0-9]/g, "");
-  return back.slice(0, 12) || "—";
-}
+export {rosterBackName} from "@/lib/roster-utils";

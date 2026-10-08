@@ -1,10 +1,7 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
-import {
-  importRosterLines,
-  parseRosterImport,
-  upsertRosterPlayer,
-} from "@/lib/portal-programs";
+import {importRosterCsvRows, upsertRosterPlayer} from "@/lib/portal-programs";
+import {previewRosterCsv} from "@/lib/roster-csv";
 
 export async function POST(
   request: Request,
@@ -25,8 +22,8 @@ export async function POST(
         text = await file.text();
       }
       const mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
-      const lines = parseRosterImport(text);
-      const result = await importRosterLines(access, slug, lines, mode);
+      const preview = previewRosterCsv(text);
+      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -37,14 +34,17 @@ export async function POST(
       num?: string;
       name?: string;
       pos?: string;
+      jersey?: string;
+      short?: string;
+      back?: string;
       rowId?: number;
       paste?: string;
       mode?: "append" | "replace";
     };
 
     if (body.paste !== undefined) {
-      const lines = parseRosterImport(String(body.paste));
-      const result = await importRosterLines(access, slug, lines, body.mode ?? "append");
+      const preview = previewRosterCsv(String(body.paste));
+      const result = await importRosterCsvRows(access, slug, preview.rows, body.mode ?? "append");
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -54,7 +54,10 @@ export async function POST(
     const result = await upsertRosterPlayer(access, slug, {
       num: String(body.num ?? ""),
       name: String(body.name ?? ""),
-      pos: String(body.pos ?? ""),
+      pos: body.pos !== undefined ? String(body.pos) : undefined,
+      jersey: body.jersey !== undefined ? String(body.jersey) : undefined,
+      short: body.short !== undefined ? String(body.short) : undefined,
+      back: body.back !== undefined ? String(body.back) : undefined,
       rowId: body.rowId,
     });
     if (!result.ok) {

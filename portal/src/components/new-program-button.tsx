@@ -84,16 +84,16 @@ export function NewProgramButton({
                 />
               </label>
               <label className="text-sm font-semibold">
-                Sport
+                Sport <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="sport"
                   required
+                  defaultValue="Soccer"
                   className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
-                  placeholder="Soccer"
                 />
               </label>
               <label className="text-sm font-semibold">
-                Level or season
+                Level or season <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="levelOrSeason"
                   required

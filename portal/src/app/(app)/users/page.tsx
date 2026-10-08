@@ -5,7 +5,7 @@ import {isInviteEmailConfigured} from "@/lib/email/sender";
 import {listPortalUsersWithInviteMeta} from "@/lib/portal-invites";
 import {createShellConfig} from "@/lib/shell-config";
 import {getShellMetrics} from "@/lib/shell-metrics";
-import {getUserAssignments, listProgramsForAdmin} from "@/lib/queries";
+import {getUserAssignments, listProgramsForAdminPicker} from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,7 @@ export default async function UsersPage() {
   const metrics = await getShellMetrics(access, entity);
   const shellConfig = createShellConfig(access, entity, metrics);
   const {users, inviteColumnsReady} = await listPortalUsersWithInviteMeta();
-  const allPrograms = await listProgramsForAdmin();
+  const allPrograms = await listProgramsForAdminPicker();
   const assignments = Object.fromEntries(
     await Promise.all(
       users.map(async (user) => [user.id, await getUserAssignments(user.id)] as const),

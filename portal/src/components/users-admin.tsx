@@ -1,7 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {useState} from "react";
+import {useRef, useState} from "react";
 import {portalRoles} from "@/lib/roles";
 import {inviteLifecycleStatus} from "@/lib/portal-invite-status";
 
@@ -46,9 +46,17 @@ export function UsersAdmin({
   currentAdminUserId: string;
 }) {
   const router = useRouter();
+  const createFormRef = useRef<HTMLFormElement>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<{
+    id: string;
+    email: string;
+    programs: number;
+    rosterPlayers: number;
+    organizations: number;
+  } | null>(null);
 
   return (
     <div>
@@ -70,6 +78,7 @@ export function UsersAdmin({
       ) : null}
 
       <form
+        ref={createFormRef}
         className="mt-6 grid max-w-xl gap-3 rounded-3xl bg-white p-5"
         onSubmit={async (event) => {
           event.preventDefault();
@@ -99,6 +108,7 @@ export function UsersAdmin({
               : `Created ${payload.user.email}. ${invite?.detail ?? "Use Send invite or copy the link below."}`,
           );
           if (invite?.url && !invite.emailSent) setLink(invite.url);
+          createFormRef.current?.reset();
           router.refresh();
         }}
       >
@@ -166,34 +176,57 @@ export function UsersAdmin({
               {user.role !== "admin" ? (
                 <div className="mt-4">
                   <p className="text-xs font-extrabold tracking-[0.08em] text-[#6d7b8a]">PROGRAMS</p>
-                  <ul className="mt-2 flex flex-col gap-1 text-sm">
-                    {programs.map((program) => {
-                      const checked = assignments[user.id]?.includes(program.slug) ?? false;
-                      return (
-                        <li key={program.slug}>
-                          <label className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              defaultChecked={checked}
-                              onChange={async (event) => {
-                                const next = new Set(assignments[user.id] ?? []);
-                                if (event.target.checked) next.add(program.slug);
-                                else next.delete(program.slug);
-                                await fetch(`/api/admin/users/${user.id}`, {
-                                  method: "PATCH",
-                                  headers: {"Content-Type": "application/json"},
-                                  body: JSON.stringify({programSlugs: [...next]}),
-                                });
-                                router.refresh();
-                              }}
-                            />
-                            {program.name}{" "}
-                            <span className="text-[#6d7b8a]">({program.school_slug})</span>
-                          </label>
-                        </li>
-                      );
-                    })}
-                  </ul>
+                  {(() => {
+                    const slugs = assignments[user.id] ?? [];
+                    const assigned = programs.filter((program) => slugs.includes(program.slug));
+                    return assigned.length === 0 ? (
+                      <p className="mt-2 text-sm text-[#6d7b8a]">No programs</p>
+                    ) : (
+                      <ul className="mt-2 flex flex-wrap gap-2">
+                        {assigned.map((program) => (
+                          <li
+                            key={program.slug}
+                            className="rounded-full bg-[#eef1f4] px-3 py-1 text-sm font-medium"
+                          >
+                            {program.name}
+                          </li>
+                        ))}
+                      </ul>
+                    );
+                  })()}
+                  <details className="mt-3 rounded-2xl border border-[#e4dfd6] px-4 py-3">
+                    <summary className="cursor-pointer text-sm font-semibold text-[#1f8a4d]">
+                      Assign programs
+                    </summary>
+                    <ul className="mt-3 flex max-h-48 flex-col gap-1 overflow-y-auto text-sm">
+                      {programs.map((program) => {
+                        const checked = assignments[user.id]?.includes(program.slug) ?? false;
+                        return (
+                          <li key={program.slug}>
+                            <label className="flex items-center gap-2">
+                              <input
+                                type="checkbox"
+                                defaultChecked={checked}
+                                onChange={async (event) => {
+                                  const next = new Set(assignments[user.id] ?? []);
+                                  if (event.target.checked) next.add(program.slug);
+                                  else next.delete(program.slug);
+                                  await fetch(`/api/admin/users/${user.id}`, {
+                                    method: "PATCH",
+                                    headers: {"Content-Type": "application/json"},
+                                    body: JSON.stringify({programSlugs: [...next]}),
+                                  });
+                                  router.refresh();
+                                }}
+                              />
+                              {program.name}{" "}
+                              <span className="text-[#6d7b8a]">({program.school_slug})</span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </details>
                 </div>
               ) : null}
               <div className="mt-4 flex flex-wrap gap-2">
@@ -246,19 +279,20 @@ export function UsersAdmin({
                   className="rounded-full border border-[#e8c4c4] px-3 py-1.5 text-sm font-semibold text-[#9a3b3b]"
                   disabled={user.id === currentAdminUserId}
                   onClick={async () => {
-                    const ok = window.confirm(
-                      `Delete ${user.email}? This removes their account, sessions, assignments, and any programs only they own.`,
-                    );
-                    if (!ok) return;
                     setLink(null);
-                    const response = await fetch(`/api/admin/users/${user.id}`, {method: "DELETE"});
-                    const payload = await response.json();
-                    if (!response.ok) {
-                      setMessage(payload.error ?? "Could not delete user");
+                    const previewRes = await fetch(`/api/admin/users/${user.id}/delete-preview`);
+                    const preview = await previewRes.json();
+                    if (!previewRes.ok) {
+                      setMessage(preview.error ?? "Could not load delete preview");
                       return;
                     }
-                    setMessage(`Deleted ${payload.email ?? user.email}.`);
-                    router.refresh();
+                    setDeleteTarget({
+                      id: user.id,
+                      email: preview.email,
+                      programs: preview.programs ?? 0,
+                      rosterPlayers: preview.rosterPlayers ?? 0,
+                      organizations: preview.organizations ?? 0,
+                    });
                   }}
                 >
                   Delete user
@@ -268,6 +302,66 @@ export function UsersAdmin({
           );
         })}
       </ul>
+
+      {deleteTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="max-w-md rounded-3xl bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-black">Delete {deleteTarget.email}?</h2>
+            <p className="mt-3 text-sm leading-6 text-[#3c4a5c]">
+              This removes their portal access, sessions, and program assignments.
+              {deleteTarget.programs > 0 ? (
+                <>
+                  {" "}
+                  Also deletes {deleteTarget.programs} program
+                  {deleteTarget.programs === 1 ? "" : "s"} they solely own
+                  {deleteTarget.rosterPlayers > 0
+                    ? ` (${deleteTarget.rosterPlayers} roster player${
+                        deleteTarget.rosterPlayers === 1 ? "" : "s"
+                      })`
+                    : ""}
+                  {deleteTarget.organizations > 0
+                    ? ` and ${deleteTarget.organizations} organization${
+                        deleteTarget.organizations === 1 ? "" : "s"
+                      }`
+                    : ""}
+                  .
+                </>
+              ) : (
+                " Programs shared with other users are not changed."
+              )}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="rounded-full bg-[#9a3b3b] px-4 py-2 text-sm font-semibold text-white"
+                onClick={async () => {
+                  const response = await fetch(`/api/admin/users/${deleteTarget.id}`, {
+                    method: "DELETE",
+                  });
+                  const payload = await response.json();
+                  if (!response.ok) {
+                    setMessage(payload.error ?? "Could not delete user");
+                    setDeleteTarget(null);
+                    return;
+                  }
+                  setMessage(`Deleted ${payload.email ?? deleteTarget.email}.`);
+                  setDeleteTarget(null);
+                  router.refresh();
+                }}
+              >
+                Delete user
+              </button>
+              <button
+                type="button"
+                className="rounded-full border px-4 py-2 text-sm font-semibold"
+                onClick={() => setDeleteTarget(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

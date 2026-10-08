@@ -4,6 +4,7 @@ import Link from "next/link";
 import {useRouter} from "next/navigation";
 import {useState} from "react";
 import {NewProgramButton} from "@/components/new-program-button";
+import {RosterImportPanel} from "@/components/roster-import-panel";
 
 export function OnboardingChecklist({
   firstName,
@@ -21,10 +22,8 @@ export function OnboardingChecklist({
   defaultOrganizationName: string;
 }) {
   const router = useRouter();
-  const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [paste, setPaste] = useState("Name,Number\nAlex,10\nJordan,7");
 
   async function dismiss() {
     setPending(true);
@@ -36,28 +35,6 @@ export function OnboardingChecklist({
       setError(payload?.error ?? "Could not dismiss checklist");
       return;
     }
-    router.refresh();
-  }
-
-  async function submitRoster() {
-    if (!programSlug) {
-      setError("Create a program first.");
-      return;
-    }
-    setPending(true);
-    setError(null);
-    const res = await fetch(`/api/programs/${programSlug}/roster`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({paste, mode: "append"}),
-    });
-    setPending(false);
-    if (!res.ok) {
-      const payload = await res.json().catch(() => null);
-      setError(payload?.error ?? "Could not save roster");
-      return;
-    }
-    setMessage("Roster saved. You can edit players anytime from Programs → Roster.");
     router.refresh();
   }
 
@@ -74,7 +51,6 @@ export function OnboardingChecklist({
           <code className="text-xs">npm run db:migrate</code> (migration 003) when ready.
         </p>
       ) : null}
-      {message ? <p className="mt-4 text-sm font-semibold text-[#187243]">{message}</p> : null}
       {error ? <p className="mt-4 text-sm font-semibold text-[#9a3b3b]">{error}</p> : null}
 
       <ol className="mt-6 flex flex-col gap-3">
@@ -118,32 +94,17 @@ export function OnboardingChecklist({
             <div className="min-w-0 flex-1">
               <p className="font-semibold">Add your roster</p>
               <p className="mt-1 text-sm text-[#3c4a5c]">
-                Paste or import CSV, or add players on the program roster tab.
+                Import a CSV with names, numbers, and sizes — or add one player on the roster tab.
               </p>
               {hasProgram && programSlug && !hasRoster ? (
-                <div className="mt-3 flex flex-col gap-2">
-                  <textarea
-                    value={paste}
-                    onChange={(event) => setPaste(event.target.value)}
-                    rows={5}
-                    className="w-full rounded-xl border px-3 py-2 text-sm font-normal"
-                  />
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={pending}
-                      onClick={() => void submitRoster()}
-                      className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                    >
-                      Save roster
-                    </button>
-                    <Link
-                      href={`/programs/${programSlug}?tab=roster`}
-                      className="rounded-full border px-4 py-2 text-sm font-semibold"
-                    >
-                      Open roster editor
-                    </Link>
-                  </div>
+                <div className="mt-3 flex flex-col gap-3">
+                  <RosterImportPanel programSlug={programSlug} compact />
+                  <Link
+                    href={`/programs/${programSlug}?tab=roster`}
+                    className="inline-flex w-fit rounded-full border px-4 py-2 text-sm font-semibold"
+                  >
+                    Add one player
+                  </Link>
                 </div>
               ) : null}
               {hasRoster && programSlug ? (
