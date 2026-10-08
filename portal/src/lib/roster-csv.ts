@@ -1,36 +1,33 @@
-import {ROSTER_CSV_TEMPLATE} from "@/lib/roster-csv-template";
-import {rosterBackName, rosterRowSubmitted} from "@/lib/roster-utils";
-
-export {ROSTER_CSV_TEMPLATE};
+import {rowSizesComplete, normalizeSizeValue} from "@/lib/program-sized-items";
+import {rosterBackName} from "@/lib/roster-utils";
 
 /** Upper bound on raw CSV text accepted by the import routes (~200 KB). */
 export const MAX_ROSTER_CSV_CHARS = 200_000;
 /** Upper bound on players per import. */
 export const MAX_ROSTER_IMPORT_ROWS = 500;
 
-const MAX_FIELD_LENGTH = {num: 8, name: 80, pos: 24, jersey: 16, short: 16, back: 24} as const;
-
 export const ROSTER_CSV_TOO_LARGE = `CSV is too large. Keep it under ${Math.round(
   MAX_ROSTER_CSV_CHARS / 1000,
 )} KB (up to ${MAX_ROSTER_IMPORT_ROWS} players).`;
 
-/** Returns an error message when the CSV text is too large to import, otherwise null. */
 export function rosterCsvSizeError(text: string) {
   return text.length > MAX_ROSTER_CSV_CHARS ? ROSTER_CSV_TOO_LARGE : null;
 }
+
+export type SizedItemForCsv = {id: number; name: string; sizeOptions: string[]};
 
 export type ParsedRosterCsvRow = {
   rowIndex: number;
   num: string;
   name: string;
   pos: string;
-  jersey: string;
-  short: string;
   back: string;
+  sizes: Record<number, string>;
 };
 
 export type ValidatedRosterCsvRow = ParsedRosterCsvRow & {
   errors: string[];
+  warnings: string[];
   ok: boolean;
   submitted: boolean;
 };
@@ -47,38 +44,47 @@ function headerIndex(headerParts: string[], patterns: RegExp[]) {
   return -1;
 }
 
-export function parseRosterCsv(text: string): ParsedRosterCsvRow[] {
+function normalizeHeader(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+}
+
+export function parseRosterCsvForItems(text: string, items: SizedItemForCsv[]): ParsedRosterCsvRow[] {
   const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
   let numCol = 1;
   let nameCol = 0;
+  let backCol = -1;
   let posCol = -1;
-  let jerseyCol = 2;
-  let shortCol = 3;
-  let backCol = 4;
+  const itemCols = new Map<number, number>();
   let body = lines;
 
   const headerParts = splitCsvLine(lines[0]).map((cell) => cell.toLowerCase());
   const looksLikeHeader = headerParts.some((header) =>
-    /^(name|number|num|#|no|jersey|short|back|position|pos|athlete|top|shorts)$/.test(header),
+    /^(name|number|num|#|no|back|position|pos|athlete|jersey|short|hoodie|hat|socks)/.test(header),
   );
 
   if (looksLikeHeader) {
     body = lines.slice(1);
     const nameIdx = headerIndex(headerParts, [/^name$/, /^athlete$/]);
     const numIdx = headerIndex(headerParts, [/^number$/, /^num$/, /^#$/, /^no$/]);
-    const posIdx = headerIndex(headerParts, [/^pos$/, /^position$/]);
-    const jerseyIdx = headerIndex(headerParts, [/^jersey$/, /^jersey_size$/, /^top$/, /^jersey_top$/]);
-    const shortIdx = headerIndex(headerParts, [/^short$/, /^short_size$/, /^shorts$/]);
     const backIdx = headerIndex(headerParts, [/^back$/, /^back_name$/, /^name_on_back$/]);
-
+    const posIdx = headerIndex(headerParts, [/^pos$/, /^position$/]);
     if (nameIdx >= 0) nameCol = nameIdx;
     if (numIdx >= 0) numCol = numIdx;
-    if (posIdx >= 0) posCol = posIdx;
-    if (jerseyIdx >= 0) jerseyCol = jerseyIdx;
-    if (shortIdx >= 0) shortCol = shortIdx;
     if (backIdx >= 0) backCol = backIdx;
+    if (posIdx >= 0) posCol = posIdx;
+
+    const rawHeaders = splitCsvLine(lines[0]);
+    for (const item of items) {
+      const target = normalizeHeader(item.name);
+      const idx = rawHeaders.findIndex((header) => normalizeHeader(header) === target);
+      if (idx >= 0) itemCols.set(item.id, idx);
+    }
+  } else if (items.length === 2) {
+    itemCols.set(items[0]!.id, 2);
+    itemCols.set(items[1]!.id, 3);
+    backCol = 4;
   }
 
   const out: ParsedRosterCsvRow[] = [];
@@ -93,71 +99,75 @@ export function parseRosterCsv(text: string): ParsedRosterCsvRow[] {
       name = cols[0] ?? "";
       num = cols[1] ?? "";
     }
-    if (!name && cols.length === 1) {
-      const parts = line.split(/\s+/);
-      if (parts.length >= 2) {
-        num = parts[0] ?? "";
-        name = parts.slice(1).join(" ");
-      }
-    }
 
-    const jerseyRaw = jerseyCol >= 0 ? cols[jerseyCol] : "";
-    const shortRaw = shortCol >= 0 ? cols[shortCol] : "";
-    const backRaw = backCol >= 0 ? cols[backCol] : "";
     const posRaw = posCol >= 0 ? cols[posCol] : "";
-
-    const jersey = jerseyRaw?.trim() || "—";
-    const short = shortRaw?.trim() || "—";
-    const back = backRaw?.trim() || rosterBackName(name);
-    const pos = posRaw?.trim() || "—";
+    const backRaw = backCol >= 0 ? cols[backCol] : "";
+    const sizes: Record<number, string> = {};
+    for (const [itemId, colIndex] of itemCols) {
+      const raw = cols[colIndex] ?? "";
+      if (raw.trim()) sizes[itemId] = raw.trim();
+    }
 
     out.push({
       rowIndex: index + (looksLikeHeader ? 2 : 1),
       num: num.trim(),
       name: name.trim(),
-      pos,
-      jersey,
-      short,
-      back,
+      pos: posRaw?.trim() || "—",
+      back: backRaw?.trim() || rosterBackName(name),
+      sizes,
     });
   }
 
-  return out;
+  return out.slice(0, MAX_ROSTER_IMPORT_ROWS + 1);
 }
 
-export function validateRosterCsvRows(rows: ParsedRosterCsvRow[]): ValidatedRosterCsvRow[] {
+export function validateRosterCsvRows(
+  rows: ParsedRosterCsvRow[],
+  items: SizedItemForCsv[],
+): ValidatedRosterCsvRow[] {
   const seenNumbers = new Map<string, number>();
   return rows.map((row) => {
     const errors: string[] = [];
+    const warnings: string[] = [];
     if (!row.name) errors.push("Name is required.");
     if (!row.num) errors.push("Number is required.");
+    if (row.num.length > 8) errors.push("Number is too long (max 8).");
+    if (row.name.length > 80) errors.push("Name is too long (max 80).");
+    if (row.back.length > 24) errors.push("Back name is too long (max 24).");
     if (row.num) {
       const prior = seenNumbers.get(row.num);
-      if (prior !== undefined) {
-        errors.push(`Duplicate number (also on row ${prior}).`);
+      if (prior !== undefined) errors.push(`Duplicate number (also on row ${prior}).`);
+      else seenNumbers.set(row.num, row.rowIndex);
+    }
+
+    const canonical: Record<number, string> = {};
+    for (const item of items) {
+      const raw = row.sizes[item.id]?.trim();
+      if (!raw) continue;
+      const normalized = normalizeSizeValue(raw, item.sizeOptions);
+      if (!normalized) {
+        errors.push(`Invalid ${item.name} size "${raw}".`);
       } else {
-        seenNumbers.set(row.num, row.rowIndex);
+        canonical[item.id] = normalized;
       }
     }
-    for (const [field, max] of Object.entries(MAX_FIELD_LENGTH) as [keyof typeof MAX_FIELD_LENGTH, number][]) {
-      if (row[field].length > max) {
-        errors.push(`${field === "num" ? "Number" : field[0].toUpperCase() + field.slice(1)} is too long (max ${max}).`);
-      }
-    }
-    const submitted = rosterRowSubmitted(row.jersey, row.short, row.back);
+
+    const submitted = rowSizesComplete(items, canonical);
     return {
       ...row,
+      sizes: canonical,
       errors,
+      warnings,
       ok: errors.length === 0,
       submitted,
     };
   });
 }
 
-export function previewRosterCsv(text: string) {
-  const rows = parseRosterCsv(text);
+export function previewRosterCsvForItems(text: string, items: SizedItemForCsv[]) {
+  const rows = parseRosterCsvForItems(text, items);
   const tooManyRows = rows.length > MAX_ROSTER_IMPORT_ROWS;
-  const validated = validateRosterCsvRows(rows.slice(0, MAX_ROSTER_IMPORT_ROWS));
+  const validated = validateRosterCsvRows(rows.slice(0, MAX_ROSTER_IMPORT_ROWS), items);
   const validRows = validated.filter((row) => row.ok);
   return {
     rows: validated,
@@ -167,5 +177,14 @@ export function previewRosterCsv(text: string) {
     error: tooManyRows
       ? `Too many rows (${rows.length}). Import up to ${MAX_ROSTER_IMPORT_ROWS} players at a time.`
       : undefined,
+    unknownColumnsWarning:
+      items.length === 0
+        ? "No sized items configured for this program yet."
+        : undefined,
   };
+}
+
+/** Legacy static template when sized items are unavailable. */
+export function legacyRosterCsvTemplate() {
+  return "name,number,back_name,jersey,short\nAlex Example,10,EXAMPLE,M,M\n";
 }

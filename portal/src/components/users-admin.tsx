@@ -1,7 +1,7 @@
 "use client";
 
 import {useRouter} from "next/navigation";
-import {useRef, useState} from "react";
+import {useEffect, useRef, useState} from "react";
 import {portalRoles} from "@/lib/roles";
 import {inviteLifecycleStatus} from "@/lib/portal-invite-status";
 
@@ -50,6 +50,8 @@ export function UsersAdmin({
   const [message, setMessage] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [createProgramSlugs, setCreateProgramSlugs] = useState<string[]>([]);
+  const deleteDialogRef = useRef<HTMLDivElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<{
     id: string;
     email: string;
@@ -57,6 +59,17 @@ export function UsersAdmin({
     rosterPlayers: number;
     organizations: number;
   } | null>(null);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const dialog = deleteDialogRef.current;
+    dialog?.querySelector<HTMLElement>("button")?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteTarget]);
 
   return (
     <div>
@@ -93,6 +106,7 @@ export function UsersAdmin({
               email: data.get("email"),
               name: data.get("name"),
               role: data.get("role"),
+              programSlugs: createProgramSlugs,
             }),
           });
           setPending(false);
@@ -109,6 +123,7 @@ export function UsersAdmin({
           );
           if (invite?.url && !invite.emailSent) setLink(invite.url);
           createFormRef.current?.reset();
+          setCreateProgramSlugs([]);
           router.refresh();
         }}
       >
@@ -128,6 +143,31 @@ export function UsersAdmin({
             </option>
           ))}
         </select>
+        <div>
+          <p className="text-xs font-extrabold tracking-[0.08em] text-[#6d7b8a]">ASSIGN PROGRAMS (OPTIONAL)</p>
+          <ul className="mt-2 max-h-40 flex flex-col gap-1 overflow-y-auto text-sm">
+            {programs.map((program) => (
+              <li key={program.slug}>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={createProgramSlugs.includes(program.slug)}
+                    onChange={(event) => {
+                      setCreateProgramSlugs((current) => {
+                        const next = new Set(current);
+                        if (event.target.checked) next.add(program.slug);
+                        else next.delete(program.slug);
+                        return [...next];
+                      });
+                    }}
+                  />
+                  {program.name}{" "}
+                  <span className="text-[#6d7b8a]">({program.school_slug})</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        </div>
         <button
           type="submit"
           disabled={pending}
@@ -305,8 +345,16 @@ export function UsersAdmin({
 
       {deleteTarget ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="max-w-md rounded-3xl bg-white p-6 shadow-xl">
-            <h2 className="text-lg font-black">Delete {deleteTarget.email}?</h2>
+          <div
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-user-title"
+            className="max-w-md rounded-3xl bg-white p-6 shadow-xl"
+          >
+            <h2 id="delete-user-title" className="text-lg font-black">
+              Delete {deleteTarget.email}?
+            </h2>
             <p className="mt-3 text-sm leading-6 text-[#3c4a5c]">
               This removes their portal access, sessions, and program assignments.
               {deleteTarget.programs > 0 ? (

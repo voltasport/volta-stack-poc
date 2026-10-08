@@ -129,6 +129,41 @@ try {
   const programUrl = benPage.url();
   step("create_program", `Program created (${programUrl})`);
 
+  const slugMatchEarly = programUrl.match(/\/programs\/([^/?]+)/);
+  const programSlugEarly = slugMatchEarly?.[1];
+  if (programSlugEarly) {
+    const poolBackfill = new Pool({connectionString: process.env.DATABASE_URL});
+    const legacy = (
+      await poolBackfill.query(
+        `select count(*)::int as n from roster_row_sizes rs
+         join roster_rows r on r.id = rs.roster_row_id
+         where r.program_slug = 'womens-soccer'`,
+      )
+    ).rows[0]?.n;
+    await poolBackfill.end();
+    step(
+      "migration_backfill",
+      legacy > 0
+        ? `Legacy womens-soccer jersey/short backfill (${legacy} size values)`
+        : "No legacy backfill rows (ok if seed ran after migration)",
+      true,
+    );
+  }
+
+  await benPage.goto(`${programUrl.split("?")[0]}?tab=sized-items`, {waitUntil: "networkidle"});
+  const addItemSection = benPage.locator("text=ADD ITEM").locator("..");
+  await addItemSection.locator('input[placeholder="Hoodie"]').fill("Hoodie");
+  await addItemSection.locator('input[placeholder="S,M,L,XL"]').fill("S,M,L,XL");
+  await benPage.getByRole("button", {name: "Add sized item"}).click();
+  await benPage.waitForTimeout(400);
+  await addItemSection.locator('input[placeholder="Hoodie"]').fill("Hat");
+  await addItemSection.locator('input[placeholder="S,M,L,XL"]').fill("S/M,L/XL,One size");
+  await benPage.getByRole("button", {name: "Add sized item"}).click();
+  await benPage.waitForTimeout(400);
+  step("sized_items", "Added Hoodie and Hat sized items");
+  report.screenshots.push(await capture(benPage, "e2e-sized-items-1440.png", 1440, 900));
+  report.screenshots.push(await capture(benPage, "e2e-sized-items-1024.png", 1024, 768));
+
   await benPage.goto(`${base}/`, {waitUntil: "networkidle"});
   const checklistAfterProgram = await benPage.locator("body").innerText();
   if (!checklistAfterProgram.includes("Add your roster")) {
@@ -148,10 +183,21 @@ try {
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1440.png", 1440, 900));
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1024.png", 1024, 768));
 
+  const badCsv =
+    "name,number,back_name,Jersey,Short,Hoodie,Hat\nAlex Example,10,EXAMPLE,M,M,L,ZZZ\nJordan Lee,7,LEE,L,L,M,S/M";
+  await benPage.getByLabel("Roster CSV").first().fill(badCsv);
+  await benPage.getByRole("button", {name: "Preview import"}).first().click();
+  await benPage.waitForSelector("text=Invalid", {timeout: 15000});
+  step("csv_import_validation", "Import preview flags invalid Hat size");
+  report.screenshots.push(await capture(benPage, "e2e-import-preview-error-1440.png", 1440, 900));
+  report.screenshots.push(await capture(benPage, "e2e-import-preview-error-1024.png", 1024, 768));
+
   await benPage
     .getByLabel("Roster CSV")
     .first()
-    .fill("name,number,jersey,short,back_name\nAlex Example,10,M,M,EXAMPLE\nJordan Lee,7,L,L,LEE");
+    .fill(
+      "name,number,back_name,Jersey,Short,Hoodie,Hat\nAlex Example,10,EXAMPLE,M,M,L,S/M\nJordan Lee,7,LEE,L,L,M,S/M",
+    );
   await benPage.getByRole("button", {name: "Preview import"}).first().click();
   await benPage.waitForSelector("text=ready to save", {timeout: 15000});
   await benPage.getByRole("button", {name: "Save to roster"}).first().click();
@@ -175,9 +221,10 @@ try {
   }
 
   await benPage.goto(`${programUrl.split("?")[0]}?tab=roster`, {waitUntil: "networkidle"});
+  report.screenshots.push(await capture(benPage, "e2e-roster-multi-items-1440.png", 1440, 900));
   await benPage.fill('input[placeholder="#"]', "99");
   await benPage.fill('input[placeholder="Name"]', "Manual Player");
-  await benPage.fill('input[placeholder="Jersey size"]', "L");
+  await benPage.locator("label:has-text('Jersey') select").first().selectOption("L");
   await benPage.getByRole("button", {name: "Add player"}).click();
   await benPage.waitForTimeout(500);
   const rosterText = await benPage.locator("body").innerText();
@@ -187,6 +234,13 @@ try {
   step("add_roster", "Manual roster player saved");
   report.screenshots.push(await capture(benPage, "e2e-roster-1440.png", 1440, 900));
   report.screenshots.push(await capture(benPage, "e2e-roster-1024.png", 1024, 768));
+
+  await adminPage.goto(`${base}/users`, {waitUntil: "networkidle"});
+  const benRow = adminPage.locator("li").filter({hasText: creds.benEmail});
+  await benRow.getByRole("button", {name: "Delete user"}).click();
+  await adminPage.waitForSelector('[role="dialog"]', {timeout: 10000});
+  report.screenshots.push(await capture(adminPage, "e2e-delete-user-modal-1440.png", 1440, 900));
+  await adminPage.getByRole("button", {name: "Cancel"}).click();
 
   await purgeOnboardingUserByEmail(creds.benEmail);
   step("cleanup", "Purged Ben after successful flow");

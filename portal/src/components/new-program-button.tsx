@@ -2,6 +2,7 @@
 
 import {useRouter} from "next/navigation";
 import {useState} from "react";
+import {SIZED_ITEM_PRESETS} from "@/lib/sized-item-presets";
 
 export function NewProgramButton({
   className = "",
@@ -28,6 +29,7 @@ export function NewProgramButton({
         levelOrSeason: data.get("levelOrSeason"),
         rosterSize: data.get("rosterSize"),
         organizationName: data.get("organizationName"),
+        sizedItemsPresetId: data.get("sizedItemsPresetId"),
       }),
     });
     setPending(false);
@@ -65,7 +67,7 @@ export function NewProgramButton({
               }}
             >
               <label className="text-sm font-semibold">
-                Organization or school name
+                Organization or school name <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="organizationName"
                   required
@@ -75,7 +77,7 @@ export function NewProgramButton({
                 />
               </label>
               <label className="text-sm font-semibold">
-                Program name
+                Program name <span className="text-[#9a3b3b]">*</span>
                 <input
                   name="name"
                   required
@@ -100,6 +102,20 @@ export function NewProgramButton({
                   className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
                   placeholder="Varsity · Fall 2026"
                 />
+              </label>
+              <label className="text-sm font-semibold">
+                Initial sized items
+                <select
+                  name="sizedItemsPresetId"
+                  defaultValue="default-kit"
+                  className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
+                >
+                  {SIZED_ITEM_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.label}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label className="text-sm font-semibold">
                 Expected roster size (optional)

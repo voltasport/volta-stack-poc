@@ -1,12 +1,21 @@
 import {randomBytes} from "node:crypto";
 import type {AccessContext} from "@/lib/access";
-import {sql, sqlTransaction, type SqlStatement} from "@/lib/db";
+import {sql, type SqlStatement} from "@/lib/db";
 import {
   ensurePortalOrganization,
   linkUserToOrganization,
   organizationNameFromEmail,
   slugifyOrganizationName,
 } from "@/lib/portal-organizations";
+import {
+  ensureDefaultSizedItems,
+  createSizedItemsFromPreset,
+  loadProgramSizedItems,
+  programSizedItemsTableReady,
+  rowSizesComplete,
+  syncLegacyColumnsFromSizes,
+  upsertRosterRowSizes,
+} from "@/lib/program-sized-items";
 import {rosterBackName, rosterRowSubmitted} from "@/lib/roster-utils";
 import type {ValidatedRosterCsvRow} from "@/lib/roster-csv";
 
@@ -16,6 +25,7 @@ export type CreateProgramInput = {
   levelOrSeason: string;
   rosterSize?: number | null;
   organizationName: string;
+  sizedItemsPresetId?: string;
 };
 
 function slugify(name: string) {
@@ -132,6 +142,12 @@ export async function createProgramForUser(access: AccessContext, input: CreateP
     );
   }
 
+  if (input.sizedItemsPresetId) {
+    await createSizedItemsFromPreset(slug, input.sizedItemsPresetId);
+  } else {
+    await ensureDefaultSizedItems(slug);
+  }
+
   return {ok: true as const, slug};
 }
 
@@ -177,32 +193,44 @@ export async function importRosterCsvRows(
     return {ok: false as const, error: "Add at least one valid player."};
   }
 
-  // One atomic batch: a failed import never leaves a half-replaced roster.
-  const statements: SqlStatement[] = [];
+  const tableReady = await programSizedItemsTableReady();
+  const sizedItems = tableReady ? await loadProgramSizedItems(programSlug) : [];
+
   if (mode === "replace") {
-    statements.push({text: `delete from roster_rows where program_slug = $1`, params: [programSlug]});
+    await sql().query(`delete from roster_rows where program_slug = $1`, [programSlug]);
   }
-  statements.push({
-    text: `insert into roster_rows (
-             program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-           )
-           select $1, u.num, u.name, u.pos, u.jersey, u.short, u.back, u.submitted::boolean,
-                  (select coalesce(max(sort_order), -1) from roster_rows where program_slug = $1) + u.ord
-           from unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
-             with ordinality as u(num, name, pos, jersey, short, back, submitted, ord)
-           order by u.ord`,
-    params: [
-      programSlug,
-      valid.map((row) => row.num),
-      valid.map((row) => row.name),
-      valid.map((row) => row.pos || "—"),
-      valid.map((row) => row.jersey),
-      valid.map((row) => row.short),
-      valid.map((row) => row.back),
-      valid.map((row) => (row.submitted ? "true" : "false")),
-    ],
-  });
-  await sqlTransaction(statements);
+
+  const baseSortRows = (await sql().query(
+    `select coalesce(max(sort_order), -1) as max from roster_rows where program_slug = $1`,
+    [programSlug],
+  )) as {max: number}[];
+  let sort = (baseSortRows[0]?.max ?? -1) + 1;
+
+  for (const row of valid) {
+    const jersey =
+      sizedItems.find((item) => item.name.toLowerCase() === "jersey")?.id !== undefined
+        ? row.sizes[sizedItems.find((item) => item.name.toLowerCase() === "jersey")!.id] ?? "—"
+        : "—";
+    const short =
+      sizedItems.find((item) => item.name.toLowerCase() === "short")?.id !== undefined
+        ? row.sizes[sizedItems.find((item) => item.name.toLowerCase() === "short")!.id] ?? "—"
+        : "—";
+    const submitted = tableReady
+      ? rowSizesComplete(sizedItems, row.sizes)
+      : rosterRowSubmitted(jersey, short, row.back);
+    const inserted = (await sql().query(
+      `insert into roster_rows (
+         program_slug, num, name, pos, jersey, short, back, submitted, sort_order
+       ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       returning id`,
+      [programSlug, row.num, row.name, row.pos || "—", jersey, short, row.back, submitted, sort++],
+    )) as {id: number}[];
+    const rowId = inserted[0]?.id;
+    if (rowId && tableReady && sizedItems.length > 0) {
+      await upsertRosterRowSizes(rowId, programSlug, row.sizes, sizedItems);
+      await syncLegacyColumnsFromSizes(rowId, sizedItems, row.sizes);
+    }
+  }
 
   return {ok: true as const, count: valid.length};
 }
@@ -225,6 +253,7 @@ export async function upsertRosterPlayer(
     jersey?: string;
     short?: string;
     back?: string;
+    sizes?: Record<number, string>;
     rowId?: number;
   },
 ) {
@@ -241,19 +270,42 @@ export async function upsertRosterPlayer(
     return {ok: false as const, error: "Number or name is too long."};
   }
 
-  const jersey = (input.jersey ?? "—").trim() || "—";
-  const short = (input.short ?? "—").trim() || "—";
   const back = (input.back ?? rosterBackName(name)).trim() || rosterBackName(name);
-  if (pos.length > 24 || jersey.length > 16 || short.length > 16 || back.length > 24) {
-    return {ok: false as const, error: "Size or back name is too long."};
+  if (pos.length > 24 || back.length > 24) {
+    return {ok: false as const, error: "Field value is too long."};
   }
-  const submitted = rosterRowSubmitted(jersey, short, back);
+
+  const tableReady = await programSizedItemsTableReady();
+  const sizedItems = tableReady ? await loadProgramSizedItems(programSlug) : [];
+  const sizes: Record<number, string> = {};
+  if (input.sizes) {
+    for (const [key, value] of Object.entries(input.sizes)) {
+      sizes[Number(key)] = String(value);
+    }
+  }
+  let jersey = (input.jersey ?? "—").trim() || "—";
+  let short = (input.short ?? "—").trim() || "—";
+  if (tableReady && sizedItems.length > 0) {
+    const jerseyItem = sizedItems.find((item) => item.name.toLowerCase() === "jersey");
+    const shortItem = sizedItems.find((item) => item.name.toLowerCase() === "short");
+    if (jerseyItem && sizes[jerseyItem.id]) jersey = sizes[jerseyItem.id];
+    if (shortItem && sizes[shortItem.id]) short = sizes[shortItem.id];
+  }
+
+  const submitted =
+    tableReady && sizedItems.length > 0
+      ? rowSizesComplete(sizedItems, sizes)
+      : rosterRowSubmitted(jersey, short, back);
+
   if (input.rowId) {
     await sql().query(
       `update roster_rows set num = $2, name = $3, pos = $4, jersey = $5, short = $6, back = $7, submitted = $8
        where id = $1 and program_slug = $9`,
       [input.rowId, num, name, pos, jersey, short, back, submitted, programSlug],
     );
+    if (tableReady && sizedItems.length > 0) {
+      await upsertRosterRowSizes(input.rowId, programSlug, sizes, sizedItems);
+    }
     return {ok: true as const};
   }
 
@@ -262,11 +314,16 @@ export async function upsertRosterPlayer(
     [programSlug],
   )) as {max: number}[];
   const sort = (existing[0]?.max ?? -1) + 1;
-  await sql().query(
+  const inserted = (await sql().query(
     `insert into roster_rows (
       program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    returning id`,
     [programSlug, num, name, pos, jersey, short, back, submitted, sort],
-  );
+  )) as {id: number}[];
+  const rowId = inserted[0]?.id;
+  if (rowId && tableReady && sizedItems.length > 0) {
+    await upsertRosterRowSizes(rowId, programSlug, sizes, sizedItems);
+  }
   return {ok: true as const};
 }

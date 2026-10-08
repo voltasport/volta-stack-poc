@@ -1,10 +1,16 @@
 import {NextResponse} from "next/server";
 import {createPortalUser, deliverUserInvite} from "@/lib/admin-users";
+import {setUserAssignments} from "@/lib/queries";
 import {isPortalRole} from "@/lib/roles";
 
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as {email?: string; name?: string; role?: string};
+    const body = (await request.json()) as {
+      email?: string;
+      name?: string;
+      role?: string;
+      programSlugs?: string[];
+    };
     const email = String(body.email ?? "").trim();
     const name = String(body.name ?? "").trim();
     const role = String(body.role ?? "director");
@@ -15,6 +21,9 @@ export async function POST(request: Request) {
       return NextResponse.json({error: "Invalid role"}, {status: 400});
     }
     const result = await createPortalUser({email, name, role});
+    if (role !== "admin" && body.programSlugs && body.programSlugs.length > 0) {
+      await setUserAssignments(result.user.id, body.programSlugs.map(String));
+    }
     const invite = await deliverUserInvite({
       userId: result.user.id,
       email: result.user.email,

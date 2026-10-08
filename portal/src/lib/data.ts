@@ -3,7 +3,14 @@
 
 export type Status = "On track" | "Needs you" | "Complete" | "Starting";
 
-export type TabId = "items" | "roster" | "proofs" | "files";
+export type TabId = "items" | "roster" | "sized-items" | "proofs" | "files";
+
+export type ProgramSizedItem = {
+  id: number;
+  name: string;
+  sizeOptions: string[];
+  sortOrder: number;
+};
 
 export type RosterRow = {
   id?: number;
@@ -14,6 +21,8 @@ export type RosterRow = {
   short: string;
   back: string;
   submitted: boolean;
+  /** sized item id -> canonical size value */
+  sizesByItemId?: Record<number, string>;
 };
 
 export type KitItem = {
@@ -47,6 +56,8 @@ export type Program = {
   milestones: {label: string; date: string; state: "done" | "now" | "next"}[];
   proofs: {version: string; date: string; note: string; current?: boolean}[];
   files: {name: string; meta: string}[];
+  sizedItems?: ProgramSizedItem[];
+  displayWeekNote?: string;
 };
 
 const womensRoster: RosterRow[] = [

@@ -1,12 +1,18 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
+import {loadProgramSizedItems} from "@/lib/program-sized-items";
 import {importRosterCsvRows, upsertRosterPlayer} from "@/lib/portal-programs";
-import {previewRosterCsv, rosterCsvSizeError} from "@/lib/roster-csv";
+import {previewRosterCsvForItems, rosterCsvSizeError} from "@/lib/roster-csv";
 
-function bulkImportError(text: string) {
+async function bulkImportError(slug: string, text: string) {
   const sizeError = rosterCsvSizeError(text);
   if (sizeError) return {error: sizeError, status: 413};
-  const preview = previewRosterCsv(text);
+  const items = (await loadProgramSizedItems(slug)).map((item) => ({
+    id: item.id,
+    name: item.name,
+    sizeOptions: item.sizeOptions,
+  }));
+  const preview = previewRosterCsvForItems(text, items);
   if (!preview.canSave) {
     return {error: preview.error ?? "Add at least one valid player.", status: 400};
   }
@@ -32,10 +38,15 @@ export async function POST(
         text = await file.text();
       }
       const mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
-      const invalid = bulkImportError(text);
+      const invalid = await bulkImportError(slug, text);
       if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
-      const preview = previewRosterCsv(text);
-      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
+      const items = (await loadProgramSizedItems(slug)).map((item) => ({
+        id: item.id,
+        name: item.name,
+        sizeOptions: item.sizeOptions,
+      }));
+      const preview = previewRosterCsvForItems(text, items);
+      const result = await importRosterCsvRows(access, slug, preview.rows.filter((r) => r.ok), mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -49,6 +60,7 @@ export async function POST(
       jersey?: string;
       short?: string;
       back?: string;
+      sizes?: Record<number, string>;
       rowId?: number;
       paste?: string;
       mode?: "append" | "replace";
@@ -56,11 +68,16 @@ export async function POST(
 
     if (body.paste !== undefined) {
       const text = String(body.paste);
-      const invalid = bulkImportError(text);
+      const invalid = await bulkImportError(slug, text);
       if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
-      const preview = previewRosterCsv(text);
+      const items = (await loadProgramSizedItems(slug)).map((item) => ({
+        id: item.id,
+        name: item.name,
+        sizeOptions: item.sizeOptions,
+      }));
+      const preview = previewRosterCsvForItems(text, items);
       const mode = body.mode === "replace" ? "replace" : "append";
-      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
+      const result = await importRosterCsvRows(access, slug, preview.rows.filter((row) => row.ok), mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -74,6 +91,7 @@ export async function POST(
       jersey: body.jersey !== undefined ? String(body.jersey) : undefined,
       short: body.short !== undefined ? String(body.short) : undefined,
       back: body.back !== undefined ? String(body.back) : undefined,
+      sizes: body.sizes,
       rowId: typeof body.rowId === "number" && Number.isInteger(body.rowId) ? body.rowId : undefined,
     });
     if (!result.ok) {
