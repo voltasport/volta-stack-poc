@@ -1,5 +1,4 @@
-import {rowSizesComplete, normalizeSizeValue} from "@/lib/program-sized-items";
-import {rosterBackName} from "@/lib/roster-utils";
+import {normalizeSizeValue, rosterBackName, rowSizesComplete} from "@/lib/roster-utils";
 
 /** Upper bound on raw CSV text accepted by the import routes (~200 KB). */
 export const MAX_ROSTER_CSV_CHARS = 200_000;
@@ -28,6 +27,8 @@ export type ParsedRosterCsvRow = {
 export type ValidatedRosterCsvRow = ParsedRosterCsvRow & {
   errors: string[];
   warnings: string[];
+  /** Raw values that don't match the item's sizes (shown in the preview, never saved). */
+  invalidSizes: Record<number, string>;
   ok: boolean;
   submitted: boolean;
 };
@@ -45,7 +46,7 @@ function headerIndex(headerParts: string[], patterns: RegExp[]) {
 }
 
 function normalizeHeader(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ");
+  return value.toLowerCase().replace(/[^a-z0-9#]+/g, " ").trim();
 }
 
 export function parseRosterCsvForItems(text: string, items: SizedItemForCsv[]): ParsedRosterCsvRow[] {
@@ -60,8 +61,11 @@ export function parseRosterCsvForItems(text: string, items: SizedItemForCsv[]): 
   let body = lines;
 
   const headerParts = splitCsvLine(lines[0]).map((cell) => cell.toLowerCase());
-  const looksLikeHeader = headerParts.some((header) =>
-    /^(name|number|num|#|no|back|position|pos|athlete|jersey|short|hoodie|hat|socks)/.test(header),
+  const itemHeaders = new Set(items.map((item) => normalizeHeader(item.name)));
+  const looksLikeHeader = headerParts.some(
+    (header) =>
+      /^(name|number|num|#|no|back|back_name|position|pos|athlete)$/.test(header) ||
+      itemHeaders.has(normalizeHeader(header)),
   );
 
   if (looksLikeHeader) {
@@ -141,12 +145,14 @@ export function validateRosterCsvRows(
     }
 
     const canonical: Record<number, string> = {};
+    const invalidSizes: Record<number, string> = {};
     for (const item of items) {
       const raw = row.sizes[item.id]?.trim();
       if (!raw) continue;
       const normalized = normalizeSizeValue(raw, item.sizeOptions);
       if (!normalized) {
-        errors.push(`Invalid ${item.name} size "${raw}".`);
+        errors.push(`Invalid ${item.name} size "${raw.slice(0, 20)}" (use ${item.sizeOptions.join(", ")}).`);
+        invalidSizes[item.id] = raw.slice(0, 20);
       } else {
         canonical[item.id] = normalized;
       }
@@ -158,6 +164,7 @@ export function validateRosterCsvRows(
       sizes: canonical,
       errors,
       warnings,
+      invalidSizes,
       ok: errors.length === 0,
       submitted,
     };
@@ -170,6 +177,8 @@ export function previewRosterCsvForItems(text: string, items: SizedItemForCsv[])
   const validated = validateRosterCsvRows(rows.slice(0, MAX_ROSTER_IMPORT_ROWS), items);
   const validRows = validated.filter((row) => row.ok);
   return {
+    /** Columns the preview table should render, in order. */
+    items: items.map((item) => ({id: item.id, name: item.name})),
     rows: validated,
     validCount: validRows.length,
     invalidCount: validated.length - validRows.length,
@@ -177,14 +186,23 @@ export function previewRosterCsvForItems(text: string, items: SizedItemForCsv[])
     error: tooManyRows
       ? `Too many rows (${rows.length}). Import up to ${MAX_ROSTER_IMPORT_ROWS} players at a time.`
       : undefined,
-    unknownColumnsWarning:
-      items.length === 0
-        ? "No sized items configured for this program yet."
-        : undefined,
+    unmatchedColumns: unmatchedHeaderColumns(text, items),
   };
 }
 
-/** Legacy static template when sized items are unavailable. */
-export function legacyRosterCsvTemplate() {
-  return "name,number,back_name,jersey,short\nAlex Example,10,EXAMPLE,M,M\n";
+const KNOWN_HEADERS = /^(name|athlete|number|num|#|no|back|back name|name on back|pos|position)$/;
+
+/** Header columns that are neither roster fields nor a sized item (their values are ignored). */
+function unmatchedHeaderColumns(text: string, items: SizedItemForCsv[]) {
+  const firstLine = text.split(/\r?\n/).find((line) => line.trim());
+  if (!firstLine) return [];
+  const headers = splitCsvLine(firstLine).filter(Boolean);
+  const itemHeaders = new Set(items.map((item) => normalizeHeader(item.name)));
+  const isHeaderRow = headers.some(
+    (header) => KNOWN_HEADERS.test(normalizeHeader(header)) || itemHeaders.has(normalizeHeader(header)),
+  );
+  if (!isHeaderRow) return [];
+  return headers
+    .filter((header) => !KNOWN_HEADERS.test(normalizeHeader(header)) && !itemHeaders.has(normalizeHeader(header)))
+    .slice(0, 10);
 }

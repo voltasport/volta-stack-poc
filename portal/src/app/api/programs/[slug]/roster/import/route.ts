@@ -1,9 +1,8 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
-import {buildRosterCsvTemplate, loadProgramSizedItems, programSizedItemsTableReady} from "@/lib/program-sized-items";
+import {buildRosterCsvTemplate, canViewProgram, loadSizedItems} from "@/lib/program-kit-items";
 import {assertCanEditProgramRoster, importRosterCsvRows} from "@/lib/portal-programs";
 import {
-  legacyRosterCsvTemplate,
   MAX_ROSTER_CSV_CHARS,
   previewRosterCsvForItems,
   ROSTER_CSV_TOO_LARGE,
@@ -13,15 +12,16 @@ import {
 const MAX_REQUEST_BYTES = MAX_ROSTER_CSV_CHARS * 2;
 
 export async function GET(_request: Request, {params}: {params: Promise<{slug: string}>}) {
+  const access = await getAccessContext();
+  if (!access) return NextResponse.json({error: "Unauthorized"}, {status: 401});
   const {slug} = await params;
-  const tableReady = await programSizedItemsTableReady();
-  const items = tableReady ? await loadProgramSizedItems(slug) : [];
-  const template =
-    items.length > 0 ? buildRosterCsvTemplate(items) : legacyRosterCsvTemplate();
+  if (!canViewProgram(access, slug)) return NextResponse.json({error: "Forbidden"}, {status: 403});
+  const template = buildRosterCsvTemplate(await loadSizedItems(slug));
+  const safeName = slug.replace(/[^a-z0-9-]/gi, "").slice(0, 60) || "program";
   return new NextResponse(template, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${slug}-roster-template.csv"`,
+      "Content-Disposition": `attachment; filename="${safeName}-roster-template.csv"`,
     },
   });
 }
@@ -44,8 +44,7 @@ export async function POST(
       return NextResponse.json({error: ROSTER_CSV_TOO_LARGE}, {status: 413});
     }
 
-    const tableReady = await programSizedItemsTableReady();
-    const sizedItems = tableReady ? await loadProgramSizedItems(slug) : [];
+    const sizedItems = await loadSizedItems(slug);
     const itemsForCsv = sizedItems.map((item) => ({
       id: item.id,
       name: item.name,

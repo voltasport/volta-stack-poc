@@ -1,13 +1,13 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
-import {loadProgramSizedItems} from "@/lib/program-sized-items";
+import {loadSizedItems} from "@/lib/program-kit-items";
 import {importRosterCsvRows, upsertRosterPlayer} from "@/lib/portal-programs";
 import {previewRosterCsvForItems, rosterCsvSizeError} from "@/lib/roster-csv";
 
 async function bulkImportError(slug: string, text: string) {
   const sizeError = rosterCsvSizeError(text);
   if (sizeError) return {error: sizeError, status: 413};
-  const items = (await loadProgramSizedItems(slug)).map((item) => ({
+  const items = (await loadSizedItems(slug)).map((item) => ({
     id: item.id,
     name: item.name,
     sizeOptions: item.sizeOptions,
@@ -40,7 +40,7 @@ export async function POST(
       const mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
       const invalid = await bulkImportError(slug, text);
       if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
-      const items = (await loadProgramSizedItems(slug)).map((item) => ({
+      const items = (await loadSizedItems(slug)).map((item) => ({
         id: item.id,
         name: item.name,
         sizeOptions: item.sizeOptions,
@@ -60,7 +60,7 @@ export async function POST(
       jersey?: string;
       short?: string;
       back?: string;
-      sizes?: Record<number, string>;
+      sizes?: unknown;
       rowId?: number;
       paste?: string;
       mode?: "append" | "replace";
@@ -70,7 +70,7 @@ export async function POST(
       const text = String(body.paste);
       const invalid = await bulkImportError(slug, text);
       if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
-      const items = (await loadProgramSizedItems(slug)).map((item) => ({
+      const items = (await loadSizedItems(slug)).map((item) => ({
         id: item.id,
         name: item.name,
         sizeOptions: item.sizeOptions,

@@ -1,74 +1,54 @@
-import type {Program, RosterRow} from "@/lib/data";
 import type {AccessContext} from "@/lib/access";
+import type {Program, ProgramSizedItem, RosterRow} from "@/lib/data";
 import {
   computeProgramWeekNote,
-  ensureDefaultSizedItems,
-  legacySizedItemsForProgram,
-  loadProgramSizedItems,
-  loadRosterRowSizeMap,
-  programSizedItemsTableReady,
-  rowSizesComplete,
-} from "@/lib/program-sized-items";
-import {rosterRowSubmitted} from "@/lib/roster-utils";
+  kitSizesReady,
+  legacySizedItems,
+  LEGACY_JERSEY_ID,
+  LEGACY_SHORT_ID,
+  loadRosterSizes,
+  missingSizesByProgram,
+} from "@/lib/program-kit-items";
+import {normalizeSizeValue, rowSizesComplete} from "@/lib/roster-utils";
 
-export async function enrichProgram(program: Program): Promise<Program> {
-  const tableReady = await programSizedItemsTableReady();
-  if (!tableReady) {
-    const legacyItems = legacySizedItemsForProgram().map((item, index) => ({
-      id: index + 1,
-      name: item.name,
-      sizeOptions: item.sizeOptions,
-      sortOrder: index,
-    }));
-    const roster = program.roster.map((row) => enrichLegacyRosterRow(row));
-    const missingSizes = roster.filter((row) => !row.submitted).length;
-    return {
-      ...program,
-      sizedItems: legacyItems,
-      roster,
-      displayWeekNote: computeProgramWeekNote({
-        rosterCount: roster.length,
-        missingSizes,
-        sizedItemCount: legacyItems.length,
-      }),
-    };
-  }
+function legacyRowSizes(row: RosterRow): Record<number, string> {
+  const sizes: Record<number, string> = {};
+  if (row.jersey && row.jersey !== "—") sizes[LEGACY_JERSEY_ID] = row.jersey;
+  if (row.short && row.short !== "—") sizes[LEGACY_SHORT_ID] = row.short;
+  return sizes;
+}
 
-  let sizedItems = await loadProgramSizedItems(program.slug);
-  if (sizedItems.length === 0) {
-    await ensureDefaultSizedItems(program.slug);
-    sizedItems = await loadProgramSizedItems(program.slug);
-  }
-  const sizeMap = await loadRosterRowSizeMap(program.slug);
+function enrichWith(
+  program: Program,
+  ready: boolean,
+  sizeMap: Map<number, Record<number, string>>,
+): Program {
+  const sizedItems: ProgramSizedItem[] = ready
+    ? program.items
+        .filter((item) => item.id !== undefined && (item.sizeOptions?.length ?? 0) > 0)
+        .map((item, index) => ({
+          id: item.id!,
+          name: item.name,
+          sizeOptions: item.sizeOptions ?? [],
+          sortOrder: index,
+        }))
+    : legacySizedItems();
+
   const roster = program.roster.map((row) => {
-    if (!row.id) return row;
-    const values = {...(sizeMap.get(row.id) ?? {})};
-    for (const item of sizedItems) {
-      if (values[item.id]) continue;
-      if (item.name.toLowerCase() === "jersey" && row.jersey && row.jersey !== "—") {
-        values[item.id] = row.jersey;
-      }
-      if (item.name.toLowerCase() === "short" && row.short && row.short !== "—") {
-        values[item.id] = row.short;
-      }
-    }
+    const stored = ready ? (row.id ? sizeMap.get(Number(row.id)) ?? {} : {}) : legacyRowSizes(row);
     const sizesByItemId: Record<number, string> = {};
     for (const item of sizedItems) {
-      if (values[item.id]) sizesByItemId[item.id] = values[item.id];
+      const value = stored[item.id];
+      if (value) sizesByItemId[item.id] = normalizeSizeValue(value, item.sizeOptions) ?? value;
     }
-    const submitted = rowSizesComplete(sizedItems, sizesByItemId);
-    return {...row, sizesByItemId, submitted};
+    return {...row, sizesByItemId, submitted: rowSizesComplete(sizedItems, sizesByItemId)};
   });
 
   const missingSizes = roster.filter((row) => !row.submitted).length;
   return {
     ...program,
-    sizedItems: sizedItems.map((item) => ({
-      id: item.id,
-      name: item.name,
-      sizeOptions: item.sizeOptions,
-      sortOrder: item.sortOrder,
-    })),
+    sizedItems,
+    sizesReady: ready,
     roster,
     displayWeekNote: computeProgramWeekNote({
       rosterCount: roster.length,
@@ -78,60 +58,26 @@ export async function enrichProgram(program: Program): Promise<Program> {
   };
 }
 
-function enrichLegacyRosterRow(row: RosterRow): RosterRow {
-  const submitted = rosterRowSubmitted(row.jersey, row.short, row.back);
-  return {
-    ...row,
-    submitted,
-    sizesByItemId: {
-      1: row.jersey,
-      2: row.short,
-    },
-  };
+/** Attach sized items and per-item roster sizes (two queries total, regardless of program count). */
+export async function enrichPrograms(programs: Program[]) {
+  if (programs.length === 0) return programs;
+  const ready = await kitSizesReady();
+  const sizeMap = ready ? await loadRosterSizes(programs.map((program) => program.slug)) : new Map();
+  return programs.map((program) => enrichWith(program, ready, sizeMap));
 }
 
-export async function enrichPrograms(programs: Program[]) {
-  return Promise.all(programs.map((program) => enrichProgram(program)));
+export async function enrichProgram(program: Program) {
+  const [enriched] = await enrichPrograms([program]);
+  return enriched!;
 }
 
 export async function buildMissingSizesTasks(access: AccessContext) {
-  const tableReady = await programSizedItemsTableReady();
-  if (!tableReady) return [] as {
-    href: string;
-    title: string;
-    detail: string;
-    badge: "4";
-    program_slug: string;
-  }[];
-
-  if (!access.canSeeAllSchools && (!access.programSlugs || access.programSlugs.length === 0)) {
-    return [];
-  }
-
-  const {sql} = await import("@/lib/db");
-  const slugFilter = access.canSeeAllSchools
-    ? ""
-    : " and p.slug = any($1::text[])";
-  const params = access.canSeeAllSchools ? [] : [access.programSlugs];
-
-  const rows = (await sql().query(
-    `select p.slug, p.name,
-            count(r.id)::int as roster_count,
-            count(r.id) filter (where not r.submitted)::int as missing_count
-     from programs p
-     join roster_rows r on r.program_slug = p.slug
-     where exists (select 1 from program_sized_items i where i.program_slug = p.slug)
-     ${slugFilter}
-     group by p.slug, p.name
-     having count(r.id) filter (where not r.submitted) > 0`,
-    params,
-  )) as {slug: string; name: string; missing_count: number}[];
-
+  const rows = await missingSizesByProgram(access.canSeeAllSchools ? null : access.programSlugs ?? []);
   return rows.map((row) => ({
     href: `/programs/${row.slug}?tab=roster`,
-    title: `${row.missing_count} athlete${row.missing_count === 1 ? "" : "s"} missing sizes`,
+    title: `${row.missing} athlete${row.missing === 1 ? "" : "s"} missing sizes`,
     detail: `${row.name} · complete all kit sizes`,
     badge: "4" as const,
-    program_slug: row.slug,
+    program_slug: row.slug as string | null,
   }));
 }

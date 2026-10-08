@@ -2,7 +2,6 @@
 
 import {useRouter} from "next/navigation";
 import {useState} from "react";
-import {SIZED_ITEM_PRESETS} from "@/lib/sized-item-presets";
 
 export function NewProgramButton({
   className = "",
@@ -104,18 +103,18 @@ export function NewProgramButton({
                 />
               </label>
               <label className="text-sm font-semibold">
-                Initial sized items
+                Starting kit
                 <select
                   name="sizedItemsPresetId"
                   defaultValue="default-kit"
                   className="mt-1 w-full rounded-xl border px-3 py-2 font-normal"
                 >
-                  {SIZED_ITEM_PRESETS.map((preset) => (
-                    <option key={preset.id} value={preset.id}>
-                      {preset.label}
-                    </option>
-                  ))}
+                  <option value="default-kit">Jersey + Short (sized)</option>
+                  <option value="none">Start empty, add items later</option>
                 </select>
+                <span className="mt-1 block text-xs font-normal text-[#6d7b8a]">
+                  You can add items like hoodies, hats, or bags on the program&apos;s Items tab.
+                </span>
               </label>
               <label className="text-sm font-semibold">
                 Expected roster size (optional)

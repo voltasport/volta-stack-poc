@@ -3,7 +3,7 @@
 
 export type Status = "On track" | "Needs you" | "Complete" | "Starting";
 
-export type TabId = "items" | "roster" | "sized-items" | "proofs" | "files";
+export type TabId = "items" | "roster" | "proofs" | "files";
 
 export type ProgramSizedItem = {
   id: number;
@@ -26,10 +26,13 @@ export type RosterRow = {
 };
 
 export type KitItem = {
+  id?: number;
   name: string;
   qty: string;
   proof: string;
   status: string;
+  /** Empty for unsized items (e.g. a bag). */
+  sizeOptions?: string[];
 };
 
 export type Program = {
@@ -56,7 +59,10 @@ export type Program = {
   milestones: {label: string; date: string; state: "done" | "now" | "next"}[];
   proofs: {version: string; date: string; note: string; current?: boolean}[];
   files: {name: string; meta: string}[];
+  /** Kit items that carry size options (roster columns + CSV template). */
   sizedItems?: ProgramSizedItem[];
+  /** False until migration 004 runs; kit item editing is disabled meanwhile. */
+  sizesReady?: boolean;
   displayWeekNote?: string;
 };
 
@@ -97,7 +103,7 @@ export const programs: Program[] = [
       {name: "Training shirt ×3", qty: "342", proof: "v2", status: "Sewing"},
       {name: "Pullover hoodie", qty: "114", proof: "v1", status: "Sewing"},
       {name: "Quarter zip + jogger", qty: "114", proof: "v2", status: "Printing"},
-      {name: "Coaches kit", qty: "[n]", proof: "v1", status: "Sewing"},
+      {name: "Coaches kit", qty: "12", proof: "v1", status: "Sewing"},
     ],
     roster: [
       {num: "1", name: "A. Cole", pos: "—", jersey: "M", short: "M", back: "COLE", submitted: true},

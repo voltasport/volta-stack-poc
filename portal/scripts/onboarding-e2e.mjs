@@ -16,7 +16,7 @@ for (const line of readFileSync(new URL("../.env.local", import.meta.url), "utf8
 assertLocalDatabaseUrl();
 
 const base = process.env.PORTAL_BASE_URL ?? "http://localhost:3001";
-const out = "/opt/cursor/artifacts";
+const out = process.env.E2E_ARTIFACTS_DIR ?? "/opt/cursor/artifacts";
 mkdirSync(out, {recursive: true});
 const creds = onboardingE2eCredentials();
 
@@ -129,40 +129,41 @@ try {
   const programUrl = benPage.url();
   step("create_program", `Program created (${programUrl})`);
 
-  const slugMatchEarly = programUrl.match(/\/programs\/([^/?]+)/);
-  const programSlugEarly = slugMatchEarly?.[1];
-  if (programSlugEarly) {
-    const poolBackfill = new Pool({connectionString: process.env.DATABASE_URL});
-    const legacy = (
-      await poolBackfill.query(
-        `select count(*)::int as n from roster_row_sizes rs
-         join roster_rows r on r.id = rs.roster_row_id
-         where r.program_slug = 'womens-soccer'`,
-      )
-    ).rows[0]?.n;
-    await poolBackfill.end();
-    step(
-      "migration_backfill",
-      legacy > 0
-        ? `Legacy womens-soccer jersey/short backfill (${legacy} size values)`
-        : "No legacy backfill rows (ok if seed ran after migration)",
-      true,
-    );
-  }
+  const programSlug = programUrl.match(/\/programs\/([^/?]+)/)?.[1];
+  const modePool = new Pool({connectionString: process.env.DATABASE_URL});
+  const kitMode = (
+    await modePool.query(
+      `select 1 from information_schema.columns where table_name = 'kit_items' and column_name = 'size_options'`,
+    )
+  ).rows.length > 0;
+  await modePool.end();
+  report.mode = kitMode ? "kit-items (migration 004)" : "legacy (before migration 004)";
 
-  await benPage.goto(`${programUrl.split("?")[0]}?tab=sized-items`, {waitUntil: "networkidle"});
-  const addItemSection = benPage.locator("text=ADD ITEM").locator("..");
-  await addItemSection.locator('input[placeholder="Hoodie"]').fill("Hoodie");
-  await addItemSection.locator('input[placeholder="S,M,L,XL"]').fill("S,M,L,XL");
-  await benPage.getByRole("button", {name: "Add sized item"}).click();
-  await benPage.waitForTimeout(400);
-  await addItemSection.locator('input[placeholder="Hoodie"]').fill("Hat");
-  await addItemSection.locator('input[placeholder="S,M,L,XL"]').fill("S/M,L/XL,One size");
-  await benPage.getByRole("button", {name: "Add sized item"}).click();
-  await benPage.waitForTimeout(400);
-  step("sized_items", "Added Hoodie and Hat sized items");
-  report.screenshots.push(await capture(benPage, "e2e-sized-items-1440.png", 1440, 900));
-  report.screenshots.push(await capture(benPage, "e2e-sized-items-1024.png", 1024, 768));
+  // Items tab: one kit list; sized items carry size options, unsized items (bag) don't.
+  await benPage.goto(programUrl.split("?")[0], {waitUntil: "networkidle"});
+  const itemsText = await benPage.locator("body").innerText();
+  if (itemsText.includes("Sized items")) step("items_tab", "Separate Sized items tab still present", false);
+  if (kitMode) {
+    if (!itemsText.includes("Jersey") || !itemsText.includes("Short")) {
+      step("items_tab", "Starting kit (Jersey + Short) missing from Items tab", false);
+    }
+    const addItem = async (name, sizes) => {
+      await benPage.getByLabel(/Item name/).last().fill(name);
+      await benPage.getByLabel(/Sizes \(comma separated/).fill(sizes);
+      await benPage.getByRole("button", {name: "Add item", exact: true}).click();
+      await benPage.locator("td", {hasText: name}).first().waitFor({timeout: 10000});
+    };
+    await addItem("Hoodie", "S, M, L, XL");
+    await addItem("Hat", "S/M, L/XL, One size");
+    await benPage.getByRole("button", {name: "+ Bag (no sizes)"}).click();
+    await benPage.locator("td", {hasText: "Bag"}).first().waitFor({timeout: 10000});
+    step("kit_items", "Added Hoodie + Hat (sized) and Bag (unsized) on the Items tab");
+  } else {
+    if (itemsText.includes("ADD ITEM")) step("items_tab", "Item editing shown before migration 004", false);
+    step("kit_items", "Legacy mode: Items tab read-only, roster uses Jersey/Short");
+  }
+  report.screenshots.push(await capture(benPage, "e2e-items-tab-1440.png", 1440, 900));
+  report.screenshots.push(await capture(benPage, "e2e-items-tab-1024.png", 1024, 768));
 
   await benPage.goto(`${base}/`, {waitUntil: "networkidle"});
   const checklistAfterProgram = await benPage.locator("body").innerText();
@@ -183,41 +184,69 @@ try {
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1440.png", 1440, 900));
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1024.png", 1024, 768));
 
-  const badCsv =
-    "name,number,back_name,Jersey,Short,Hoodie,Hat\nAlex Example,10,EXAMPLE,M,M,L,ZZZ\nJordan Lee,7,LEE,L,L,M,S/M";
+  const header = kitMode ? "name,number,back_name,Jersey,Short,Hoodie,Hat" : "name,number,back_name,Jersey,Short";
+  const badCsv = kitMode
+    ? `${header}\nAlex Example,10,EXAMPLE,M,M,L,ZZZ\nJordan Lee,7,LEE,L,L,M,S/M`
+    : `${header}\nAlex Example,10,EXAMPLE,M,ZZZ\nJordan Lee,7,LEE,L,L`;
   await benPage.getByLabel("Roster CSV").first().fill(badCsv);
   await benPage.getByRole("button", {name: "Preview import"}).first().click();
   await benPage.waitForSelector("text=Invalid", {timeout: 15000});
-  step("csv_import_validation", "Import preview flags invalid Hat size");
+  const previewHeaders = await benPage.locator("table").first().locator("th").allInnerTexts();
+  const expectedCols = kitMode ? ["Jersey", "Short", "Hoodie", "Hat"] : ["Jersey", "Short"];
+  for (const col of expectedCols) {
+    if (!previewHeaders.map((h) => h.trim()).includes(col)) {
+      step("csv_preview_columns", `Preview missing ${col} column (got ${previewHeaders.join("|")})`, false);
+    }
+  }
+  if (previewHeaders.map((h) => h.trim()).includes("Bag")) {
+    step("csv_preview_columns", "Unsized Bag should not be a size column", false);
+  }
+  const previewText = await benPage.locator("table").first().innerText();
+  if (!/\bM\b/.test(previewText) || !/\bL\b/.test(previewText)) {
+    step("csv_preview_values", "Preview did not show parsed size values", false);
+  }
+  step("csv_import_validation", `Preview shows ${expectedCols.join("/")} values and flags the invalid size`);
   report.screenshots.push(await capture(benPage, "e2e-import-preview-error-1440.png", 1440, 900));
   report.screenshots.push(await capture(benPage, "e2e-import-preview-error-1024.png", 1024, 768));
 
-  await benPage
-    .getByLabel("Roster CSV")
-    .first()
-    .fill(
-      "name,number,back_name,Jersey,Short,Hoodie,Hat\nAlex Example,10,EXAMPLE,M,M,L,S/M\nJordan Lee,7,LEE,L,L,M,S/M",
-    );
+  const goodCsv = kitMode
+    ? `${header}\nAlex Example,10,EXAMPLE,M,M,L,S/M\nJordan Lee,7,LEE,L,L,M,s/m`
+    : `${header}\nAlex Example,10,EXAMPLE,M,M\nJordan Lee,7,LEE,L,L`;
+  await benPage.getByLabel("Roster CSV").first().fill(goodCsv);
   await benPage.getByRole("button", {name: "Preview import"}).first().click();
   await benPage.waitForSelector("text=ready to save", {timeout: 15000});
   await benPage.getByRole("button", {name: "Save to roster"}).first().click();
   await benPage.waitForSelector("text=/Saved \\d+ players/", {timeout: 15000});
   step("csv_import", "CSV preview + save persisted roster rows");
 
-  const slugMatch = programUrl.match(/\/programs\/([^/?]+)/);
-  const programSlug = slugMatch?.[1];
-  if (programSlug) {
+  {
     const pool2 = new Pool({connectionString: process.env.DATABASE_URL});
-    const count = (
-      await pool2.query(`select count(*)::int as n from roster_rows where program_slug = $1`, [
-        programSlug,
-      ])
-    ).rows[0]?.n;
-    await pool2.end();
-    if (!count || count < 2) {
-      step("csv_import_db", `Expected roster rows in DB, got ${count}`, false);
+    const rows = (
+      await pool2.query(
+        `select id, name, jersey, short, submitted from roster_rows where program_slug = $1 order by sort_order`,
+        [programSlug],
+      )
+    ).rows;
+    if (rows.length < 2) step("csv_import_db", `Expected 2 roster rows, got ${rows.length}`, false);
+    if (rows[0].jersey !== "M" || rows[1].short !== "L") {
+      step("csv_import_db", `Legacy jersey/short columns not filled: ${JSON.stringify(rows)}`, false);
     }
-    step("csv_import_db", `DB has ${count} roster rows`);
+    if (kitMode) {
+      const sizes = (
+        await pool2.query(
+          `select k.name, s.size_value from roster_row_sizes s join kit_items k on k.id = s.kit_item_id
+           join roster_rows r on r.id = s.roster_row_id where r.program_slug = $1 order by r.sort_order, k.sort_order`,
+          [programSlug],
+        )
+      ).rows;
+      if (sizes.length !== 8) step("csv_import_db", `Expected 8 size values, got ${JSON.stringify(sizes)}`, false);
+      if (!sizes.some((row) => row.name === "Hat" && row.size_value === "S/M")) {
+        step("csv_import_db", "Hat size not normalized to S/M", false);
+      }
+      if (!rows.every((row) => row.submitted)) step("csv_import_db", "Rows should be sizes-complete", false);
+    }
+    await pool2.end();
+    step("csv_import_db", `DB rows and sizes saved (${rows.length} players)`);
   }
 
   await benPage.goto(`${programUrl.split("?")[0]}?tab=roster`, {waitUntil: "networkidle"});
@@ -225,6 +254,11 @@ try {
   await benPage.fill('input[placeholder="#"]', "99");
   await benPage.fill('input[placeholder="Name"]', "Manual Player");
   await benPage.locator("label:has-text('Jersey') select").first().selectOption("L");
+  const rosterHeaders = (await benPage.locator("table").last().locator("th").allInnerTexts()).map((h) => h.trim());
+  for (const col of expectedCols) {
+    if (!rosterHeaders.includes(col)) step("roster_columns", `Roster missing ${col} column`, false);
+  }
+  if (rosterHeaders.includes("Bag")) step("roster_columns", "Unsized Bag should not be a roster column", false);
   await benPage.getByRole("button", {name: "Add player"}).click();
   await benPage.waitForTimeout(500);
   const rosterText = await benPage.locator("body").innerText();
@@ -253,6 +287,6 @@ try {
 }
 
 report.finishedAt = new Date().toISOString();
-writeFileSync("/opt/cursor/artifacts/onboarding-e2e-report.json", JSON.stringify(report, null, 2));
+writeFileSync(`${out}/onboarding-e2e-report.json`, JSON.stringify(report, null, 2));
 console.log(JSON.stringify(report, null, 2));
 if (!report.ok) process.exit(1);

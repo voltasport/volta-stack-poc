@@ -87,10 +87,12 @@ const programQuery = `
   from programs p
   left join lateral (
     select json_agg(json_build_object(
-      'name', name, 'qty', qty, 'proof', proof, 'status', status
-    ) order by sort_order) as items
-    from kit_items
-    where program_slug = p.slug
+      'id', k.id, 'name', k.name, 'qty', k.qty, 'proof', k.proof, 'status', k.status,
+      -- to_jsonb keeps this query valid before migration 004 adds size_options.
+      'sizeOptions', coalesce(to_jsonb(k) -> 'size_options', '[]'::jsonb)
+    ) order by k.sort_order, k.id) as items
+    from kit_items k
+    where k.program_slug = p.slug
   ) items on true
   left join lateral (
     select json_agg(json_build_object(

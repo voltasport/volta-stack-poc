@@ -5,10 +5,9 @@ import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useState} from "react";
 import type {Program, TabId} from "@/lib/data";
 import {RosterImportPanel} from "@/components/roster-import-panel";
-import {SizedItemsEditor} from "@/components/sized-items-editor";
+import {KitItemsPanel} from "@/components/kit-items-panel";
 const tabs: {id: TabId; label: string}[] = [
   {id: "items", label: "Items"},
-  {id: "sized-items", label: "Sized items"},
   {id: "roster", label: "Roster"},
   {id: "proofs", label: "Proofs"},
   {id: "files", label: "Files"},
@@ -19,13 +18,15 @@ export function ProgramDetail({
   initialTab = "items",
   showAdminActions = false,
   canEditRoster = false,
-  canEditSizedItems = false,
+  canEditItems = false,
+  isAdmin = false,
 }: {
   program: Program;
   initialTab?: string;
   showAdminActions?: boolean;
   canEditRoster?: boolean;
-  canEditSizedItems?: boolean;
+  canEditItems?: boolean;
+  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -119,25 +120,25 @@ export function ProgramDetail({
 
       <div
         className={`mt-4 grid grid-cols-1 gap-4 ${
-          tab === "roster" || tab === "sized-items"
+          tab === "roster"
             ? ""
             : "xl:grid-cols-[minmax(0,1.6fr)_280px]"
         }`}
       >
         <section className="min-w-0 rounded-3xl bg-white p-5">
-          {tab === "items" ? <Items program={program} /> : null}
-          {tab === "sized-items" ? (
-            <SizedItemsEditor
+          {tab === "items" ? (
+            <KitItemsPanel
               programSlug={program.slug}
-              items={program.sizedItems ?? []}
-              canEdit={canEditSizedItems}
+              items={program.items}
+              canEdit={canEditItems && program.sizesReady !== false}
+              isAdmin={isAdmin}
             />
           ) : null}
           {tab === "roster" ? <Roster program={program} canEdit={canEditRoster} /> : null}
           {tab === "proofs" ? <Proofs program={program} /> : null}
           {tab === "files" ? <Files program={program} /> : null}
         </section>
-        {tab === "roster" || tab === "sized-items" ? null : (
+        {tab === "roster" ? null : (
         <div className="flex flex-col gap-4">
           <section className="rounded-3xl bg-white p-5">
             <h2 className="text-sm font-extrabold tracking-[0.08em]">THIS WEEK</h2>
@@ -176,46 +177,6 @@ function ShipTo({program}: {program: Program}) {
       )}
       {hasNote ? <p className="mt-2 text-sm text-[#3c4a5c]">{note}</p> : null}
     </>
-  );
-}
-
-function Items({program}: {program: Program}) {
-  if (program.items.length === 0) {
-    return <p className="text-sm text-[#6d7b8a]">No items until kickoff.</p>;
-  }
-  return (
-    <div>
-      <h2 className="text-sm font-extrabold tracking-[0.08em]">ITEMS</h2>
-      <div className="table-scroll mt-3 -mx-5 overflow-x-auto px-5">
-      <table className="w-full min-w-[520px] text-left text-sm">
-        <thead className="text-xs text-[#7b8794]">
-          <tr>
-            <th className="pb-2 font-medium">Item</th>
-            <th className="pb-2 font-medium">Qty</th>
-            <th className="pb-2 font-medium">Proof</th>
-            <th className="pb-2 font-medium">Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {program.items.map((item) => (
-            <tr key={item.name} className="border-t border-[#f0ece4]">
-              <td className="py-3">
-                <span className="mr-3 inline-grid h-8 w-8 place-items-center rounded-lg bg-[#f3f0e8] text-[10px] text-[#7b8794]">
-                  IMG
-                </span>
-                {item.name}
-              </td>
-              <td>{item.qty}</td>
-              <td className="font-semibold text-[#1f8a4d]">
-                {item.proof} ✓
-              </td>
-              <td>{item.status}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      </div>
-    </div>
   );
 }
 
@@ -262,12 +223,14 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
       <h2 className="text-sm font-extrabold tracking-[0.08em]">ROSTER & SIZES</h2>
       <p className="mt-2 text-sm text-[#6d7b8a]">
         {canEdit
-          ? "Add players manually or paste CSV. Sizing links can fill jersey sizes later."
-          : `Players fill these in from the sizing link. ${missing} still missing.`}
+          ? "Import a CSV or add players one at a time. Size columns come from the sized items on the Items tab."
+          : missing > 0
+            ? `${missing} athlete${missing === 1 ? "" : "s"} still missing sizes.`
+            : "All sizes are in."}
       </p>
       {canEdit ? (
         <div className="mt-4 flex flex-col gap-4">
-          <RosterImportPanel programSlug={program.slug} sizedItems={sizedItems} />
+          <RosterImportPanel programSlug={program.slug} />
           <div className="rounded-2xl bg-[#f7f4ee] p-4">
             <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">ADD ONE PLAYER</p>
             <div className="mt-2 grid grid-cols-2 gap-2 lg:grid-cols-4">
