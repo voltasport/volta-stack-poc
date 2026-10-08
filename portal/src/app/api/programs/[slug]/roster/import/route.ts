@@ -1,7 +1,16 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
 import {assertCanEditProgramRoster, importRosterCsvRows} from "@/lib/portal-programs";
-import {previewRosterCsv, ROSTER_CSV_TEMPLATE} from "@/lib/roster-csv";
+import {
+  MAX_ROSTER_CSV_CHARS,
+  previewRosterCsv,
+  ROSTER_CSV_TEMPLATE,
+  ROSTER_CSV_TOO_LARGE,
+  rosterCsvSizeError,
+} from "@/lib/roster-csv";
+
+/** Raw request cap (CSV text plus JSON/multipart overhead). */
+const MAX_REQUEST_BYTES = MAX_ROSTER_CSV_CHARS * 2;
 
 export async function GET() {
   return new NextResponse(ROSTER_CSV_TEMPLATE, {
@@ -25,6 +34,11 @@ export async function POST(
       return NextResponse.json({error: "Forbidden"}, {status: 403});
     }
 
+    const declaredLength = Number(request.headers.get("content-length") ?? "0");
+    if (declaredLength > MAX_REQUEST_BYTES) {
+      return NextResponse.json({error: ROSTER_CSV_TOO_LARGE}, {status: 413});
+    }
+
     const contentType = request.headers.get("content-type") ?? "";
     let text = "";
     let mode: "append" | "replace" = "append";
@@ -35,6 +49,9 @@ export async function POST(
       text = String(form.get("text") ?? form.get("paste") ?? "");
       const file = form.get("file");
       if (file instanceof File && file.size > 0) {
+        if (file.size > MAX_REQUEST_BYTES) {
+          return NextResponse.json({error: ROSTER_CSV_TOO_LARGE}, {status: 413});
+        }
         text = await file.text();
       }
       mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
@@ -55,6 +72,11 @@ export async function POST(
       return NextResponse.json({error: "Add CSV text or upload a file."}, {status: 400});
     }
 
+    const sizeError = rosterCsvSizeError(text);
+    if (sizeError) {
+      return NextResponse.json({error: sizeError}, {status: 413});
+    }
+
     const preview = previewRosterCsv(text);
     if (action === "preview") {
       return NextResponse.json(preview);
@@ -62,7 +84,7 @@ export async function POST(
 
     if (!preview.canSave) {
       return NextResponse.json(
-        {error: "Fix validation errors before saving.", ...preview},
+        {...preview, error: preview.error ?? "Fix validation errors before saving."},
         {status: 400},
       );
     }

@@ -148,6 +148,10 @@ try {
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1440.png", 1440, 900));
   report.screenshots.push(await capture(benPage, "e2e-checklist-step2-1024.png", 1024, 768));
 
+  await benPage
+    .getByLabel("Roster CSV")
+    .first()
+    .fill("name,number,jersey,short,back_name\nAlex Example,10,M,M,EXAMPLE\nJordan Lee,7,L,L,LEE");
   await benPage.getByRole("button", {name: "Preview import"}).first().click();
   await benPage.waitForSelector("text=ready to save", {timeout: 15000});
   await benPage.getByRole("button", {name: "Save to roster"}).first().click();

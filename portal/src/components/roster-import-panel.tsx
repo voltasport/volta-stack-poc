@@ -21,6 +21,7 @@ type PreviewResponse = {
   validCount: number;
   invalidCount: number;
   canSave: boolean;
+  error?: string;
 };
 
 export function RosterImportPanel({
@@ -34,7 +35,7 @@ export function RosterImportPanel({
 }) {
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState(ROSTER_CSV_TEMPLATE);
+  const [text, setText] = useState("");
   const [mode, setMode] = useState<"append" | "replace">("append");
   const [preview, setPreview] = useState<PreviewResponse | null>(null);
   const [pending, setPending] = useState(false);
@@ -69,6 +70,7 @@ export function RosterImportPanel({
       return;
     }
     setPreview(body);
+    if (body.error) setError(body.error);
   }
 
   async function commitImport() {
@@ -128,6 +130,8 @@ export function RosterImportPanel({
         value={text}
         onChange={(event) => setText(event.target.value)}
         rows={compact ? 6 : 5}
+        placeholder={ROSTER_CSV_TEMPLATE}
+        aria-label="Roster CSV"
         className="w-full rounded-xl border px-3 py-2 text-sm font-normal"
         spellCheck={false}
       />

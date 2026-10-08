@@ -1,4 +1,5 @@
-import {sql} from "@/lib/db";
+import {sql, sqlTransaction, type SqlStatement} from "@/lib/db";
+import {allSchools, entities, pendingSchool} from "@/lib/entities";
 import {isMissingTable} from "@/lib/db-errors";
 
 export async function countAdmins() {
@@ -8,18 +9,34 @@ export async function countAdmins() {
   return rows[0]?.n ?? 0;
 }
 
+/**
+ * Seeded schools (SLCC, Davis, ...) are never cascaded, even if only one user is assigned.
+ * Only programs under a portal-created organization (portal_organizations) qualify.
+ */
+function protectedSchoolSlugs() {
+  return [...entities.map((entity) => entity.slug), allSchools.slug, pendingSchool.slug];
+}
+
 async function solelyOwnedProgramSlugs(userId: string) {
-  const rows = (await sql().query(
-    `select a.program_slug
-     from user_program_assignments a
-     where a.user_id = $1
-       and not exists (
-         select 1 from user_program_assignments b
-         where b.program_slug = a.program_slug and b.user_id <> $1
-       )`,
-    [userId],
-  )) as {program_slug: string}[];
-  return rows.map((row) => row.program_slug);
+  try {
+    const rows = (await sql().query(
+      `select a.program_slug
+       from user_program_assignments a
+       join programs p on p.slug = a.program_slug
+       join portal_organizations o on o.slug = p.school_slug
+       where a.user_id = $1
+         and not (p.school_slug = any($2::text[]))
+         and not exists (
+           select 1 from user_program_assignments b
+           where b.program_slug = a.program_slug and b.user_id <> $1
+         )`,
+      [userId, protectedSchoolSlugs()],
+    )) as {program_slug: string}[];
+    return rows.map((row) => row.program_slug);
+  } catch (error) {
+    if (isMissingTable(error, "portal_organizations")) return [] as string[];
+    throw error;
+  }
 }
 
 async function rosterCountForPrograms(slugs: string[]) {
@@ -38,6 +55,7 @@ async function solelyOwnedOrganizationSlugs(userId: string, programSlugsToRemove
     ])) as {organization_slug: string | null}[];
     const orgSlug = userRows[0]?.organization_slug;
     if (!orgSlug) return [] as string[];
+    if (protectedSchoolSlugs().includes(orgSlug)) return [] as string[];
 
     const otherUsers = (await sql().query(
       `select 1 from "user" where organization_slug = $1 and id <> $2 limit 1`,
@@ -112,24 +130,37 @@ export async function deletePortalUserById(input: {
   const programSlugs = await solelyOwnedProgramSlugs(input.targetUserId);
   const orgSlugs = await solelyOwnedOrganizationSlugs(input.targetUserId, programSlugs);
 
-  for (const slug of programSlugs) {
-    await sql().query(`delete from programs where slug = $1`, [slug]);
+  const statements: SqlStatement[] = [];
+  if (programSlugs.length > 0) {
+    // Re-check sole ownership inside the transaction so a concurrent assignment is never lost.
+    statements.push({
+      text: `delete from programs p
+             where p.slug = any($1::text[])
+               and not (p.school_slug = any($3::text[]))
+               and not exists (
+                 select 1 from user_program_assignments b
+                 where b.program_slug = p.slug and b.user_id <> $2
+               )`,
+      params: [programSlugs, input.targetUserId, protectedSchoolSlugs()],
+    });
   }
-
-  for (const slug of orgSlugs) {
-    try {
-      await sql().query(`delete from portal_organizations where slug = $1`, [slug]);
-    } catch (error) {
-      if (!isMissingTable(error, "portal_organizations")) throw error;
-    }
+  statements.push(
+    {text: `delete from user_program_assignments where user_id = $1`, params: [input.targetUserId]},
+    {text: `delete from session where "userId" = $1`, params: [input.targetUserId]},
+    {text: `delete from account where "userId" = $1`, params: [input.targetUserId]},
+    {text: `delete from "user" where id = $1`, params: [input.targetUserId]},
+  );
+  if (orgSlugs.length > 0) {
+    statements.push({
+      text: `delete from portal_organizations o
+             where o.slug = any($1::text[])
+               and not (o.slug = any($2::text[]))
+               and not exists (select 1 from "user" u where u.organization_slug = o.slug)
+               and not exists (select 1 from programs p where p.school_slug = o.slug)`,
+      params: [orgSlugs, protectedSchoolSlugs()],
+    });
   }
-
-  await sql().query(`delete from user_program_assignments where user_id = $1`, [
-    input.targetUserId,
-  ]);
-  await sql().query(`delete from session where "userId" = $1`, [input.targetUserId]);
-  await sql().query(`delete from account where "userId" = $1`, [input.targetUserId]);
-  await sql().query(`delete from "user" where id = $1`, [input.targetUserId]);
+  await sqlTransaction(statements);
 
   return {
     ok: true as const,

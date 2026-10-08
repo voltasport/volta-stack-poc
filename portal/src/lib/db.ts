@@ -7,6 +7,8 @@ export type SqlClient = {
 };
 
 let client: SqlClient | undefined;
+let pgPool: PgPool | undefined;
+let neonClient: ReturnType<typeof neon> | undefined;
 
 function isLocalPostgres(url: string) {
   return /localhost|127\.0\.0\.1/.test(url);
@@ -31,7 +33,41 @@ export function sql(): SqlClient {
     throw new Error("DATABASE_URL is not set");
   }
   if (!client) {
-    client = isLocalPostgres(url) ? wrapPg(new PgPool({connectionString: url})) : (neon(url) as SqlClient);
+    if (isLocalPostgres(url)) {
+      pgPool = new PgPool({connectionString: url});
+      client = wrapPg(pgPool);
+    } else {
+      neonClient = neon(url);
+      client = neonClient as unknown as SqlClient;
+    }
   }
   return client;
+}
+
+export type SqlStatement = {text: string; params?: unknown[]};
+
+/** Run statements atomically: all succeed or none are applied. */
+export async function sqlTransaction(statements: SqlStatement[]): Promise<void> {
+  if (statements.length === 0) return;
+  sql();
+  if (pgPool) {
+    const conn = await pgPool.connect();
+    try {
+      await conn.query("begin");
+      for (const statement of statements) {
+        await conn.query(statement.text, statement.params);
+      }
+      await conn.query("commit");
+    } catch (error) {
+      await conn.query("rollback").catch(() => {});
+      throw error;
+    } finally {
+      conn.release();
+    }
+    return;
+  }
+  const neonSql = neonClient!;
+  await neonSql.transaction(
+    statements.map((statement) => neonSql.query(statement.text, statement.params ?? [])),
+  );
 }

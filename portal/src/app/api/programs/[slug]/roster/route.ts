@@ -1,7 +1,17 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
 import {importRosterCsvRows, upsertRosterPlayer} from "@/lib/portal-programs";
-import {previewRosterCsv} from "@/lib/roster-csv";
+import {previewRosterCsv, rosterCsvSizeError} from "@/lib/roster-csv";
+
+function bulkImportError(text: string) {
+  const sizeError = rosterCsvSizeError(text);
+  if (sizeError) return {error: sizeError, status: 413};
+  const preview = previewRosterCsv(text);
+  if (!preview.canSave) {
+    return {error: preview.error ?? "Add at least one valid player.", status: 400};
+  }
+  return null;
+}
 
 export async function POST(
   request: Request,
@@ -22,6 +32,8 @@ export async function POST(
         text = await file.text();
       }
       const mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
+      const invalid = bulkImportError(text);
+      if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
       const preview = previewRosterCsv(text);
       const result = await importRosterCsvRows(access, slug, preview.rows, mode);
       if (!result.ok) {
@@ -43,8 +55,12 @@ export async function POST(
     };
 
     if (body.paste !== undefined) {
-      const preview = previewRosterCsv(String(body.paste));
-      const result = await importRosterCsvRows(access, slug, preview.rows, body.mode ?? "append");
+      const text = String(body.paste);
+      const invalid = bulkImportError(text);
+      if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
+      const preview = previewRosterCsv(text);
+      const mode = body.mode === "replace" ? "replace" : "append";
+      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -58,7 +74,7 @@ export async function POST(
       jersey: body.jersey !== undefined ? String(body.jersey) : undefined,
       short: body.short !== undefined ? String(body.short) : undefined,
       back: body.back !== undefined ? String(body.back) : undefined,
-      rowId: body.rowId,
+      rowId: typeof body.rowId === "number" && Number.isInteger(body.rowId) ? body.rowId : undefined,
     });
     if (!result.ok) {
       return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});

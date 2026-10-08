@@ -3,6 +3,22 @@ import {rosterBackName, rosterRowSubmitted} from "@/lib/roster-utils";
 
 export {ROSTER_CSV_TEMPLATE};
 
+/** Upper bound on raw CSV text accepted by the import routes (~200 KB). */
+export const MAX_ROSTER_CSV_CHARS = 200_000;
+/** Upper bound on players per import. */
+export const MAX_ROSTER_IMPORT_ROWS = 500;
+
+const MAX_FIELD_LENGTH = {num: 8, name: 80, pos: 24, jersey: 16, short: 16, back: 24} as const;
+
+export const ROSTER_CSV_TOO_LARGE = `CSV is too large. Keep it under ${Math.round(
+  MAX_ROSTER_CSV_CHARS / 1000,
+)} KB (up to ${MAX_ROSTER_IMPORT_ROWS} players).`;
+
+/** Returns an error message when the CSV text is too large to import, otherwise null. */
+export function rosterCsvSizeError(text: string) {
+  return text.length > MAX_ROSTER_CSV_CHARS ? ROSTER_CSV_TOO_LARGE : null;
+}
+
 export type ParsedRosterCsvRow = {
   rowIndex: number;
   num: string;
@@ -106,7 +122,7 @@ export function parseRosterCsv(text: string): ParsedRosterCsvRow[] {
     });
   }
 
-  return out.slice(0, 500);
+  return out;
 }
 
 export function validateRosterCsvRows(rows: ParsedRosterCsvRow[]): ValidatedRosterCsvRow[] {
@@ -123,6 +139,11 @@ export function validateRosterCsvRows(rows: ParsedRosterCsvRow[]): ValidatedRost
         seenNumbers.set(row.num, row.rowIndex);
       }
     }
+    for (const [field, max] of Object.entries(MAX_FIELD_LENGTH) as [keyof typeof MAX_FIELD_LENGTH, number][]) {
+      if (row[field].length > max) {
+        errors.push(`${field === "num" ? "Number" : field[0].toUpperCase() + field.slice(1)} is too long (max ${max}).`);
+      }
+    }
     const submitted = rosterRowSubmitted(row.jersey, row.short, row.back);
     return {
       ...row,
@@ -135,12 +156,16 @@ export function validateRosterCsvRows(rows: ParsedRosterCsvRow[]): ValidatedRost
 
 export function previewRosterCsv(text: string) {
   const rows = parseRosterCsv(text);
-  const validated = validateRosterCsvRows(rows);
+  const tooManyRows = rows.length > MAX_ROSTER_IMPORT_ROWS;
+  const validated = validateRosterCsvRows(rows.slice(0, MAX_ROSTER_IMPORT_ROWS));
   const validRows = validated.filter((row) => row.ok);
   return {
     rows: validated,
     validCount: validRows.length,
     invalidCount: validated.length - validRows.length,
-    canSave: validRows.length > 0,
+    canSave: validRows.length > 0 && !tooManyRows,
+    error: tooManyRows
+      ? `Too many rows (${rows.length}). Import up to ${MAX_ROSTER_IMPORT_ROWS} players at a time.`
+      : undefined,
   };
 }

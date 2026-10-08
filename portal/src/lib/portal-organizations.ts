@@ -1,7 +1,7 @@
 import {randomBytes} from "node:crypto";
 import {sql} from "@/lib/db";
 import {isMissingTable} from "@/lib/db-errors";
-import type {CatalogEntity} from "@/lib/entities";
+import {allSchools, entities, pendingSchool, type CatalogEntity} from "@/lib/entities";
 
 export function organizationNameFromEmail(email: string) {
   const domain = email.split("@")[1]?.split(".")[0] ?? "";
@@ -37,6 +37,9 @@ export async function ensurePortalOrganization(name: string) {
     return {ok: false as const, error: "Organizations are not available until db:migrate (003)."};
   }
   let slug = slugifyOrganizationName(trimmed);
+  // Never let a portal-created organization take a seeded school's slug (e.g. "slcc").
+  const reserved = [...entities.map((entity) => entity.slug), allSchools.slug, pendingSchool.slug];
+  if (reserved.includes(slug)) slug = `${slug}-org`;
   const existing = (await sql().query(`select slug from portal_organizations where slug = $1`, [
     slug,
   ])) as {slug: string}[];
