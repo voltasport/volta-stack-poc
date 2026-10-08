@@ -131,25 +131,7 @@ export async function getAccessContext(): Promise<AccessContext | null> {
     : await mergeEntitiesForSchoolSlugs(schoolSlugs);
 
   const isDirectorOrManager = role === "director" || role === "manager";
-  let showOnboardingChecklist = isDirectorOrManager && !onboardingDismissed;
-  if (showOnboardingChecklist && !preMigration) {
-    const assigned = (await sql().query(
-      `select 1 from user_program_assignments where user_id = $1 limit 1`,
-      [userId],
-    )) as unknown[];
-    const hasProgram = assigned.length > 0;
-    let hasRoster = false;
-    if (hasProgram) {
-      const roster = (await sql().query(
-        `select 1 from roster_rows r
-         join user_program_assignments a on a.program_slug = r.program_slug
-         where a.user_id = $1 limit 1`,
-        [userId],
-      )) as unknown[];
-      hasRoster = roster.length > 0;
-    }
-    if (hasProgram && hasRoster) showOnboardingChecklist = false;
-  }
+  const showOnboardingChecklist = isDirectorOrManager && !onboardingDismissed;
 
   return {
     userId,

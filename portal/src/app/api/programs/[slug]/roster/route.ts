@@ -1,10 +1,17 @@
 import {NextResponse} from "next/server";
 import {getAccessContext} from "@/lib/access";
-import {
-  importRosterLines,
-  parseRosterImport,
-  upsertRosterPlayer,
-} from "@/lib/portal-programs";
+import {importRosterCsvRows, upsertRosterPlayer} from "@/lib/portal-programs";
+import {previewRosterCsv, rosterCsvSizeError} from "@/lib/roster-csv";
+
+function bulkImportError(text: string) {
+  const sizeError = rosterCsvSizeError(text);
+  if (sizeError) return {error: sizeError, status: 413};
+  const preview = previewRosterCsv(text);
+  if (!preview.canSave) {
+    return {error: preview.error ?? "Add at least one valid player.", status: 400};
+  }
+  return null;
+}
 
 export async function POST(
   request: Request,
@@ -25,8 +32,10 @@ export async function POST(
         text = await file.text();
       }
       const mode = String(form.get("mode") ?? "append") === "replace" ? "replace" : "append";
-      const lines = parseRosterImport(text);
-      const result = await importRosterLines(access, slug, lines, mode);
+      const invalid = bulkImportError(text);
+      if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
+      const preview = previewRosterCsv(text);
+      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -37,14 +46,21 @@ export async function POST(
       num?: string;
       name?: string;
       pos?: string;
+      jersey?: string;
+      short?: string;
+      back?: string;
       rowId?: number;
       paste?: string;
       mode?: "append" | "replace";
     };
 
     if (body.paste !== undefined) {
-      const lines = parseRosterImport(String(body.paste));
-      const result = await importRosterLines(access, slug, lines, body.mode ?? "append");
+      const text = String(body.paste);
+      const invalid = bulkImportError(text);
+      if (invalid) return NextResponse.json({error: invalid.error}, {status: invalid.status});
+      const preview = previewRosterCsv(text);
+      const mode = body.mode === "replace" ? "replace" : "append";
+      const result = await importRosterCsvRows(access, slug, preview.rows, mode);
       if (!result.ok) {
         return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});
       }
@@ -54,8 +70,11 @@ export async function POST(
     const result = await upsertRosterPlayer(access, slug, {
       num: String(body.num ?? ""),
       name: String(body.name ?? ""),
-      pos: String(body.pos ?? ""),
-      rowId: body.rowId,
+      pos: body.pos !== undefined ? String(body.pos) : undefined,
+      jersey: body.jersey !== undefined ? String(body.jersey) : undefined,
+      short: body.short !== undefined ? String(body.short) : undefined,
+      back: body.back !== undefined ? String(body.back) : undefined,
+      rowId: typeof body.rowId === "number" && Number.isInteger(body.rowId) ? body.rowId : undefined,
     });
     if (!result.ok) {
       return NextResponse.json({error: result.error}, {status: result.error === "Forbidden" ? 403 : 400});

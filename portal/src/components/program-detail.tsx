@@ -4,6 +4,7 @@ import Link from "next/link";
 import {usePathname, useRouter, useSearchParams} from "next/navigation";
 import {useEffect, useState} from "react";
 import type {Program, TabId} from "@/lib/data";
+import {RosterImportPanel} from "@/components/roster-import-panel";
 const tabs: {id: TabId; label: string}[] = [
   {id: "items", label: "Items"},
   {id: "roster", label: "Roster"},
@@ -127,13 +128,33 @@ export function ProgramDetail({
           </section>
           <section className="rounded-3xl bg-white p-5">
             <h2 className="text-sm font-extrabold tracking-[0.08em]">SHIP TO</h2>
-            <p className="mt-3 text-sm font-semibold">{program.shipTo}</p>
-            <p className="text-sm text-[#6d7b8a]">[Address]</p>
-            <p className="mt-2 text-sm text-[#3c4a5c]">{program.shipNote}</p>
+            <ShipTo program={program} />
           </section>
         </div>
       </div>
     </div>
+  );
+}
+
+function ShipTo({program}: {program: Program}) {
+  const recipient = program.shipTo?.trim() ?? "";
+  const note = program.shipNote?.trim() ?? "";
+  const hasRecipient = recipient.length > 0 && recipient !== "TBD";
+  const hasNote = note.length > 0 && !/address added at kickoff/i.test(note);
+
+  if (!hasRecipient && !hasNote) {
+    return <p className="mt-3 text-sm text-[#6d7b8a]">No shipping address yet.</p>;
+  }
+
+  return (
+    <>
+      {hasRecipient ? (
+        <p className="mt-3 text-sm font-semibold">{recipient}</p>
+      ) : (
+        <p className="mt-3 text-sm text-[#6d7b8a]">No shipping address yet.</p>
+      )}
+      {hasNote ? <p className="mt-2 text-sm text-[#3c4a5c]">{note}</p> : null}
+    </>
   );
 }
 
@@ -182,10 +203,11 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [paste, setPaste] = useState("");
   const [num, setNum] = useState("");
   const [name, setName] = useState("");
-  const [pos, setPos] = useState("");
+  const [jersey, setJersey] = useState("");
+  const [short, setShort] = useState("");
+  const [back, setBack] = useState("");
 
   async function addPlayer() {
     setPending(true);
@@ -193,7 +215,7 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
     const res = await fetch(`/api/programs/${program.slug}/roster`, {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({num, name, pos}),
+      body: JSON.stringify({num, name, jersey, short, back}),
     });
     setPending(false);
     if (!res.ok) {
@@ -203,27 +225,10 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
     }
     setNum("");
     setName("");
-    setPos("");
+    setJersey("");
+    setShort("");
+    setBack("");
     setMessage("Player added.");
-    router.refresh();
-  }
-
-  async function importPaste(mode: "append" | "replace") {
-    setPending(true);
-    setError(null);
-    const res = await fetch(`/api/programs/${program.slug}/roster`, {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({paste, mode}),
-    });
-    setPending(false);
-    if (!res.ok) {
-      const payload = await res.json().catch(() => null);
-      setError(payload?.error ?? "Could not import roster");
-      return;
-    }
-    setPaste("");
-    setMessage("Roster imported.");
     router.refresh();
   }
 
@@ -240,64 +245,53 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
           : `Players fill these in from the sizing link. ${missing} still missing.`}
       </p>
       {canEdit ? (
-        <div className="mt-4 flex flex-col gap-3 rounded-2xl bg-[#f7f4ee] p-4">
-          <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">ADD PLAYER</p>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              value={num}
-              onChange={(e) => setNum(e.target.value)}
-              placeholder="#"
-              className="rounded-xl border px-3 py-2 text-sm"
-            />
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Name"
-              className="col-span-2 rounded-xl border px-3 py-2 text-sm"
-            />
-            <input
-              value={pos}
-              onChange={(e) => setPos(e.target.value)}
-              placeholder="Pos"
-              className="rounded-xl border px-3 py-2 text-sm"
-            />
-            <button
-              type="button"
-              disabled={pending}
-              onClick={() => void addPlayer()}
-              className="col-span-2 rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
-            >
-              Add player
-            </button>
+        <div className="mt-4 flex flex-col gap-4">
+          <RosterImportPanel programSlug={program.slug} />
+          <div className="rounded-2xl bg-[#f7f4ee] p-4">
+            <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">ADD ONE PLAYER</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <input
+                value={num}
+                onChange={(e) => setNum(e.target.value)}
+                placeholder="#"
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Name"
+                className="rounded-xl border px-3 py-2 text-sm sm:col-span-2"
+              />
+              <input
+                value={jersey}
+                onChange={(e) => setJersey(e.target.value)}
+                placeholder="Jersey size"
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+              <input
+                value={short}
+                onChange={(e) => setShort(e.target.value)}
+                placeholder="Short size"
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+              <input
+                value={back}
+                onChange={(e) => setBack(e.target.value)}
+                placeholder="Back name"
+                className="rounded-xl border px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => void addPlayer()}
+                className="rounded-full bg-[#122033] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60 sm:col-span-3"
+              >
+                Add player
+              </button>
+            </div>
+            {message ? <p className="mt-2 text-sm font-semibold text-[#187243]">{message}</p> : null}
+            {error ? <p className="mt-2 text-sm font-semibold text-[#9a3b3b]">{error}</p> : null}
           </div>
-          <p className="text-xs font-bold tracking-wide text-[#6d7b8a]">IMPORT</p>
-          <textarea
-            value={paste}
-            onChange={(e) => setPaste(e.target.value)}
-            rows={4}
-            placeholder="Name,Number&#10;Athlete,12"
-            className="rounded-xl border px-3 py-2 text-sm"
-          />
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={pending || !paste.trim()}
-              onClick={() => void importPaste("append")}
-              className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-60"
-            >
-              Append import
-            </button>
-            <button
-              type="button"
-              disabled={pending || !paste.trim()}
-              onClick={() => void importPaste("replace")}
-              className="rounded-full border px-4 py-2 text-sm font-semibold disabled:opacity-60"
-            >
-              Replace roster
-            </button>
-          </div>
-          {message ? <p className="text-sm font-semibold text-[#187243]">{message}</p> : null}
-          {error ? <p className="text-sm font-semibold text-[#9a3b3b]">{error}</p> : null}
         </div>
       ) : null}
       {program.roster.length === 0 ? (
@@ -309,7 +303,6 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
           <tr>
             <th className="pb-2 font-medium">#</th>
             <th className="pb-2 font-medium">Athlete</th>
-            <th className="pb-2 font-medium">Pos</th>
             <th className="pb-2 font-medium">Jersey</th>
             <th className="pb-2 font-medium">Short</th>
             <th className="pb-2 font-medium">Back</th>
@@ -321,7 +314,6 @@ function Roster({program, canEdit}: {program: Program; canEdit: boolean}) {
             <tr key={row.id ?? `${row.num}-${index}`} className="border-t border-[#f0ece4]">
               <td className="py-2.5">{row.num}</td>
               <td>{row.name}</td>
-              <td>{row.pos}</td>
               <td>{row.jersey}</td>
               <td>{row.short}</td>
               <td className="font-semibold tracking-wide">{row.back}</td>

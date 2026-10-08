@@ -1,13 +1,14 @@
 import {randomBytes} from "node:crypto";
 import type {AccessContext} from "@/lib/access";
-import {sql} from "@/lib/db";
+import {sql, sqlTransaction, type SqlStatement} from "@/lib/db";
 import {
   ensurePortalOrganization,
   linkUserToOrganization,
   organizationNameFromEmail,
-  rosterBackName,
   slugifyOrganizationName,
 } from "@/lib/portal-organizations";
+import {rosterBackName, rosterRowSubmitted} from "@/lib/roster-utils";
+import type {ValidatedRosterCsvRow} from "@/lib/roster-csv";
 
 export type CreateProgramInput = {
   name: string;
@@ -108,8 +109,8 @@ export async function createProgramForUser(access: AccessContext, input: CreateP
       "KICKOFF",
       "Your program is set up. Add your roster next so sizing and production can move forward.",
       "Volta portal",
-      "TBD",
-      "Address added at kickoff",
+      "",
+      "",
       schoolSlug,
       sortOrder,
     ],
@@ -162,46 +163,48 @@ export async function primaryProgramSlugForUser(userId: string) {
   return rows[0]?.program_slug ?? null;
 }
 
-export type ParsedRosterLine = {num: string; name: string; pos: string};
-
-export function parseRosterImport(text: string): ParsedRosterLine[] {
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  if (lines.length === 0) return [];
-
-  let numCol = 0;
-  let nameCol = 1;
-  let posCol = 2;
-  let body = lines;
-  const headerParts = lines[0].split(/[,;\t]/).map((c) => c.trim().toLowerCase());
-  const looksLikeHeader = headerParts.some((h) =>
-    /^(name|number|num|#|no|pos|position)$/.test(h),
-  );
-  if (looksLikeHeader) {
-    body = lines.slice(1);
-    headerParts.forEach((h, index) => {
-      if (h === "name" || h === "athlete") nameCol = index;
-      if (h === "number" || h === "num" || h === "#" || h === "no") numCol = index;
-      if (h === "pos" || h === "position") posCol = index;
-    });
+export async function importRosterCsvRows(
+  access: AccessContext,
+  programSlug: string,
+  rows: ValidatedRosterCsvRow[],
+  mode: "append" | "replace",
+) {
+  if (!(await assertCanEditProgramRoster(access, programSlug))) {
+    return {ok: false as const, error: "Forbidden"};
+  }
+  const valid = rows.filter((row) => row.ok);
+  if (valid.length === 0) {
+    return {ok: false as const, error: "Add at least one valid player."};
   }
 
-  const out: ParsedRosterLine[] = [];
-  for (const line of body) {
-    const cols = line.split(/[,;\t]/).map((c) => c.trim());
-    if (cols.length >= 2) {
-      out.push({
-        num: cols[numCol] || String(out.length + 1),
-        name: cols[nameCol] || "Athlete",
-        pos: cols[posCol] || "—",
-      });
-    } else {
-      const parts = line.split(/\s+/);
-      if (parts.length >= 2) {
-        out.push({num: parts[0], name: parts.slice(1).join(" "), pos: "—"});
-      }
-    }
+  // One atomic batch: a failed import never leaves a half-replaced roster.
+  const statements: SqlStatement[] = [];
+  if (mode === "replace") {
+    statements.push({text: `delete from roster_rows where program_slug = $1`, params: [programSlug]});
   }
-  return out.slice(0, 500);
+  statements.push({
+    text: `insert into roster_rows (
+             program_slug, num, name, pos, jersey, short, back, submitted, sort_order
+           )
+           select $1, u.num, u.name, u.pos, u.jersey, u.short, u.back, u.submitted::boolean,
+                  (select coalesce(max(sort_order), -1) from roster_rows where program_slug = $1) + u.ord
+           from unnest($2::text[], $3::text[], $4::text[], $5::text[], $6::text[], $7::text[], $8::text[])
+             with ordinality as u(num, name, pos, jersey, short, back, submitted, ord)
+           order by u.ord`,
+    params: [
+      programSlug,
+      valid.map((row) => row.num),
+      valid.map((row) => row.name),
+      valid.map((row) => row.pos || "—"),
+      valid.map((row) => row.jersey),
+      valid.map((row) => row.short),
+      valid.map((row) => row.back),
+      valid.map((row) => (row.submitted ? "true" : "false")),
+    ],
+  });
+  await sqlTransaction(statements);
+
+  return {ok: true as const, count: valid.length};
 }
 
 export async function assertCanEditProgramRoster(access: AccessContext, programSlug: string) {
@@ -210,62 +213,46 @@ export async function assertCanEditProgramRoster(access: AccessContext, programS
   return access.programSlugs.includes(programSlug);
 }
 
-export async function importRosterLines(
-  access: AccessContext,
-  programSlug: string,
-  lines: ParsedRosterLine[],
-  mode: "append" | "replace",
-) {
-  if (!(await assertCanEditProgramRoster(access, programSlug))) {
-    return {ok: false as const, error: "Forbidden"};
-  }
-  if (lines.length === 0) {
-    return {ok: false as const, error: "Add at least one player."};
-  }
-
-  if (mode === "replace") {
-    await sql().query(`delete from roster_rows where program_slug = $1`, [programSlug]);
-  }
-
-  const existing = (await sql().query(
-    `select coalesce(max(sort_order), -1) as max from roster_rows where program_slug = $1`,
-    [programSlug],
-  )) as {max: number}[];
-  let sort = (existing[0]?.max ?? -1) + 1;
-
-  for (const row of lines) {
-    const back = rosterBackName(row.name);
-    await sql().query(
-      `insert into roster_rows (
-        program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-      ) values ($1, $2, $3, $4, '—', '—', $5, false, $6)`,
-      [programSlug, row.num, row.name, row.pos, back, sort++],
-    );
-  }
-
-  return {ok: true as const, count: lines.length};
-}
+export {rosterRowSubmitted} from "@/lib/roster-utils";
 
 export async function upsertRosterPlayer(
   access: AccessContext,
   programSlug: string,
-  input: {num: string; name: string; pos: string; rowId?: number},
+  input: {
+    num: string;
+    name: string;
+    pos?: string;
+    jersey?: string;
+    short?: string;
+    back?: string;
+    rowId?: number;
+  },
 ) {
   if (!(await assertCanEditProgramRoster(access, programSlug))) {
     return {ok: false as const, error: "Forbidden"};
   }
   const num = input.num.trim();
   const name = input.name.trim();
-  const pos = input.pos.trim() || "—";
+  const pos = (input.pos ?? "—").trim() || "—";
   if (!num || !name) {
     return {ok: false as const, error: "Number and name are required."};
   }
+  if (num.length > 8 || name.length > 80) {
+    return {ok: false as const, error: "Number or name is too long."};
+  }
 
-  const back = rosterBackName(name);
+  const jersey = (input.jersey ?? "—").trim() || "—";
+  const short = (input.short ?? "—").trim() || "—";
+  const back = (input.back ?? rosterBackName(name)).trim() || rosterBackName(name);
+  if (pos.length > 24 || jersey.length > 16 || short.length > 16 || back.length > 24) {
+    return {ok: false as const, error: "Size or back name is too long."};
+  }
+  const submitted = rosterRowSubmitted(jersey, short, back);
   if (input.rowId) {
     await sql().query(
-      `update roster_rows set num = $2, name = $3, pos = $4, back = $5 where id = $1 and program_slug = $6`,
-      [input.rowId, num, name, pos, back, programSlug],
+      `update roster_rows set num = $2, name = $3, pos = $4, jersey = $5, short = $6, back = $7, submitted = $8
+       where id = $1 and program_slug = $9`,
+      [input.rowId, num, name, pos, jersey, short, back, submitted, programSlug],
     );
     return {ok: true as const};
   }
@@ -278,8 +265,8 @@ export async function upsertRosterPlayer(
   await sql().query(
     `insert into roster_rows (
       program_slug, num, name, pos, jersey, short, back, submitted, sort_order
-    ) values ($1, $2, $3, $4, '—', '—', $5, false, $6)`,
-    [programSlug, num, name, pos, back, sort],
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    [programSlug, num, name, pos, jersey, short, back, submitted, sort],
   );
   return {ok: true as const};
 }

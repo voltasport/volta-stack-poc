@@ -170,21 +170,23 @@ export async function getProgramSlugs(access: AccessContext): Promise<string[]> 
 }
 
 export async function getTasks(access: AccessContext) {
-  if (access.programSlugs !== null && access.programSlugs.length === 0) {
-    return [];
+  if (!access.canSeeAllSchools) {
+    if (!access.programSlugs || access.programSlugs.length === 0) {
+      return [];
+    }
   }
   try {
-    const rows =
-      access.programSlugs === null
-        ? await sql().query(
-            `select href, title, detail, badge, program_slug from tasks order by sort_order`,
-          )
-        : await sql().query(
-            `select href, title, detail, badge, program_slug from tasks
-             where program_slug is null or program_slug = any($1::text[])
-             order by sort_order`,
-            [access.programSlugs],
-          );
+    const rows = access.canSeeAllSchools
+      ? await sql().query(
+          `select href, title, detail, badge, program_slug from tasks order by sort_order`,
+        )
+      : await sql().query(
+          `select href, title, detail, badge, program_slug from tasks
+           where program_slug is not null
+             and program_slug = any($1::text[])
+           order by sort_order`,
+          [access.programSlugs],
+        );
     return rows as {
       href: string;
       title: string;
@@ -194,6 +196,7 @@ export async function getTasks(access: AccessContext) {
     }[];
   } catch (error) {
     if (isMissingColumn(error, "program_slug")) {
+      if (!access.canSeeAllSchools) return [];
       const rows = await sql().query(`select href, title, detail, badge from tasks order by sort_order`);
       return rows as {
         href: string;
@@ -207,24 +210,40 @@ export async function getTasks(access: AccessContext) {
   }
 }
 
-export async function getUpdates() {
+export async function getUpdates(access: AccessContext) {
+  if (!access.canSeeAllSchools) {
+    if (!access.programSlugs || access.programSlugs.length === 0) {
+      return [];
+    }
+  }
   const rows = await sql()`
     select tone, text, when_label
     from updates
     order by sort_order
   `;
-  return (rows as {tone: "live" | "idle"; text: string; when_label: string}[]).map((row) => ({
+  const all = (rows as {tone: "live" | "idle"; text: string; when_label: string}[]).map((row) => ({
     tone: row.tone,
     text: row.text,
     when: row.when_label,
   }));
+  if (access.canSeeAllSchools) return all;
+  return [];
+}
+
+export function isPlaceholderProgram(row: {slug: string; name: string}) {
+  return row.slug === "next-program" || row.name.startsWith("[");
+}
+
+export async function listProgramsForAdminPicker() {
+  const rows = await listProgramsForAdmin();
+  return rows.filter((row) => !isPlaceholderProgram(row));
 }
 
 export async function listProgramsForAdmin() {
   const rows = (await sql().query(
     `select slug, name, school_slug from programs order by sort_order`,
   )) as {slug: string; name: string; school_slug: string}[];
-  return rows;
+  return rows.filter((row) => !isPlaceholderProgram(row));
 }
 
 export async function listPortalUsers() {

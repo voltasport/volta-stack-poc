@@ -20,9 +20,7 @@ export async function getShellMetrics(
   const entityTasks =
     entity.slug === "all"
       ? tasks
-      : tasks.filter(
-          (task) => task.program_slug === null || scopedSlugs.has(task.program_slug),
-        );
+      : tasks.filter((task) => task.program_slug && scopedSlugs.has(task.program_slug));
   const approvalCount = access.showApprovals
     ? entityTasks.filter((task) => task.href.startsWith("/approvals")).length
     : 0;

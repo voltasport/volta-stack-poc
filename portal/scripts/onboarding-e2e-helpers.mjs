@@ -41,8 +41,25 @@ export async function purgeOnboardingUserByEmail(email) {
        )`,
     [id],
   );
-  for (const row of orphanSlugs.rows) {
-    await pool.query(`delete from programs where slug = $1`, [row.program_slug]);
+  const programSlugs = orphanSlugs.rows.map((row) => row.program_slug);
+  for (const slug of programSlugs) {
+    await pool.query(`delete from programs where slug = $1`, [slug]);
+  }
+
+  const orgRow = await pool.query(`select organization_slug from "user" where id = $1`, [id]);
+  const orgSlug = orgRow.rows[0]?.organization_slug;
+  if (orgSlug) {
+    const others = await pool.query(
+      `select 1 from "user" where organization_slug = $1 and id <> $2 limit 1`,
+      [orgSlug, id],
+    );
+    const remainingPrograms = await pool.query(
+      `select 1 from programs where school_slug = $1 and not (slug = any($2::text[])) limit 1`,
+      [orgSlug, programSlugs.length > 0 ? programSlugs : ["__none__"]],
+    );
+    if (others.rows.length === 0 && remainingPrograms.rows.length === 0) {
+      await pool.query(`delete from portal_organizations where slug = $1`, [orgSlug]).catch(() => {});
+    }
   }
 
   await pool.query(`delete from user_program_assignments where user_id = $1`, [id]);

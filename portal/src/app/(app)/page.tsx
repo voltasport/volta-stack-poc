@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 
 export default async function OverviewPage() {
   const {access, entity, programs, tasks, shellConfig} = await loadPortalPage();
-  const updates = await getUpdates();
+  const updates = await getUpdates(access);
   const firstName = firstNameFromUser(access.name, access.email);
 
   if (access.showOnboardingChecklist) {
@@ -89,6 +89,9 @@ export default async function OverviewPage() {
   ).length;
   const nextDelivery =
     programs.find((program) => program.deliveryDate !== "TBD")?.deliveryDate ?? "—";
+  const showNeedsYou = tasks.length > 0;
+  const showLatestFromVolta = updates.length > 0;
+  const showOverviewSidebar = showNeedsYou || showLatestFromVolta;
 
   return (
     <Shell config={shellConfig}>
@@ -136,7 +139,13 @@ export default async function OverviewPage() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.9fr)]">
+      <div
+        className={
+          showOverviewSidebar
+            ? "mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.7fr)_minmax(280px,0.9fr)]"
+            : "mt-4"
+        }
+      >
         <section className="rounded-3xl bg-white p-5 shadow-[0_1px_0_rgba(16,24,40,0.04)]">
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-extrabold tracking-[0.08em]">PROGRAMS</h2>
@@ -171,53 +180,55 @@ export default async function OverviewPage() {
           )}
         </section>
 
-        <div className="flex flex-col gap-4">
-          <section className="rounded-3xl bg-[#0e1c30] p-5 text-white">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-extrabold tracking-[0.08em]">NEEDS YOU</h2>
-              <span className="h-2 w-2 rounded-full bg-[#3dcb7a]" />
-            </div>
-            {tasks.length === 0 ? (
-              <p className="text-sm text-[#9eb0c2]">Nothing needs your attention right now.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {tasks.map((item) => (
-                  <li key={item.title}>
-                    <Link
-                      href={item.href}
-                      className="flex items-center gap-3 rounded-2xl bg-[#173049] px-3 py-3"
-                    >
-                      <Badge kind={item.badge} />
-                      <span>
-                        <span className="block text-sm font-semibold">{item.title}</span>
-                        <span className="block text-xs text-[#9eb0c2]">{item.detail}</span>
-                      </span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+        {showOverviewSidebar ? (
+          <div className="flex flex-col gap-4">
+            {showNeedsYou ? (
+              <section className="rounded-3xl bg-[#0e1c30] p-5 text-white">
+                <div className="mb-3 flex items-center justify-between">
+                  <h2 className="text-sm font-extrabold tracking-[0.08em]">NEEDS YOU</h2>
+                  <span className="h-2 w-2 rounded-full bg-[#3dcb7a]" />
+                </div>
+                <ul className="flex flex-col gap-2">
+                  {tasks.map((item) => (
+                    <li key={item.title}>
+                      <Link
+                        href={item.href}
+                        className="flex items-center gap-3 rounded-2xl bg-[#173049] px-3 py-3"
+                      >
+                        <Badge kind={item.badge} />
+                        <span>
+                          <span className="block text-sm font-semibold">{item.title}</span>
+                          <span className="block text-xs text-[#9eb0c2]">{item.detail}</span>
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
 
-          <section className="rounded-3xl bg-white p-5">
-            <h2 className="text-sm font-extrabold tracking-[0.08em]">LATEST FROM VOLTA</h2>
-            <ul className="mt-3 flex flex-col gap-3">
-              {updates.map((update) => (
-                <li key={update.text} className="flex gap-2 text-sm">
-                  <span
-                    className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-                      update.tone === "live" ? "bg-[#3dcb7a]" : "bg-[#d5dbe3]"
-                    }`}
-                  />
-                  <span>
-                    <span className="block leading-snug">{update.text}</span>
-                    <span className="text-xs text-[#7b8794]">{update.when}</span>
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </div>
+            {showLatestFromVolta ? (
+              <section className="rounded-3xl bg-white p-5">
+                <h2 className="text-sm font-extrabold tracking-[0.08em]">LATEST FROM VOLTA</h2>
+                <ul className="mt-3 flex flex-col gap-3">
+                  {updates.map((update) => (
+                    <li key={update.text} className="flex gap-2 text-sm">
+                      <span
+                        className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
+                          update.tone === "live" ? "bg-[#3dcb7a]" : "bg-[#d5dbe3]"
+                        }`}
+                      />
+                      <span>
+                        <span className="block leading-snug">{update.text}</span>
+                        <span className="text-xs text-[#7b8794]">{update.when}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Shell>
   );
